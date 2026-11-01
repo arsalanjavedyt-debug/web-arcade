@@ -1,0 +1,18 @@
+{
+  "title": "Snake",
+  "description": "The classic snake game. Eat food, grow longer and avoid hitting yourself.",
+  "category": "Classic",
+  "icon": "🐍",
+  "added": "2026-11-01",
+  "instructions": [
+    "Guide the snake to the red food to grow longer and score points.",
+    "Do not run into the walls or into your own tail.",
+    "The snake speeds up as your score climbs, so stay sharp.",
+    "Your best score is saved on your device."
+  ],
+  "controls": [
+    "Arrow keys or W A S D to steer on a keyboard",
+    "Swipe on the game area on phones and tablets",
+    "Press Space or tap to restart after game over"
+  ]
+}
