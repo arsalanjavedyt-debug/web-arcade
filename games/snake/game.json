@@ -1,18 +1,20 @@
 {
-  "title": "Snake",
-  "description": "The classic snake game. Eat food, grow longer and avoid hitting yourself.",
-  "category": "Classic",
+  "title": "Neon Snake Deluxe",
+  "description": "The arcade classic rebuilt with cyber-neon visuals, unlockable skins, exciting power-ups, combo streaks, and synthesized sound effects.",
+  "category": "Arcade",
   "icon": "🐍",
   "added": "2026-11-01",
   "instructions": [
-    "Guide the snake to the red food to grow longer and score points.",
-    "Do not run into the walls or into your own tail.",
-    "The snake speeds up as your score climbs, so stay sharp.",
-    "Your best score is saved on your device."
+    "Steer your neon viper to collect glowing fruit and grow longer.",
+    "Chain consecutive fruit quickly to build massive Combo Multipliers (up to 5x!).",
+    "Snag rare power-ups: Golden Stars (+50 pts), Turbo Rush (2x speed & score), Ghost Mode (pass through walls/body), and Frost Chill (slow-mo).",
+    "Unlock dazzling snake skins (Synthwave, Solar Viper, Prism Flux) by beating high score milestones.",
+    "Switch between Classic, Zen (wall wrap), and Speed Rush modes anytime."
   ],
   "controls": [
-    "Arrow keys or W A S D to steer on a keyboard",
-    "Swipe on the game area on phones and tablets",
-    "Press Space or tap to restart after game over"
+    "Steer with Arrow Keys or W A S D on desktop keyboards",
+    "Swipe or tap the on-screen D-Pad on mobile devices",
+    "Press Space to instantly play, retry, or pause",
+    "Toggle sound and custom skins using the top header buttons"
   ]
 }
