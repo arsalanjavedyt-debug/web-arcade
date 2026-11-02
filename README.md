@@ -20,7 +20,7 @@ A free, static browser-game arcade. Each game is a folder; a tiny build script t
 }
 ```
 
-4. Optional: add `thumbnail.png` (16:10, e.g. 640x400) in the folder to use it as the card image instead of the emoji.
+4. Optional: add `thumbnail.png` (16:10, e.g. 640×400) in the folder to use it as the card image instead of the emoji. See **Generating thumbnails** below.
 5. `git add . && git commit -m "Add My Game" && git push`. Netlify rebuilds automatically.
 
 Use relative paths for assets inside your game (`./sprite.png`, not `/sprite.png`).
@@ -29,11 +29,16 @@ Use relative paths for assets inside your game (`./sprite.png`, not `/sprite.png
 
 Open `site.config.json`:
 
-- `name`, `tagline`: your arcade's name and slogan
-- `url`: your live URL (use your Netlify URL now, your custom domain later). Used for the sitemap and canonical links.
-- `email`, `owner`: shown on the Contact, About and Privacy pages
-- `adsensePublisherId`: leave empty until AdSense approves you, then paste e.g. `ca-pub-1234567890123456`. The build adds the AdSense script to every page and generates `ads.txt`.
-- `adSlotGameBottom` (optional): an ad unit ID from AdSense, shown under the game.
+| Field | Purpose |
+|---|---|
+| `name`, `tagline` | Your arcade's name and slogan |
+| `url` | Your live URL (Netlify URL or custom domain). Used for the sitemap and canonical links. |
+| `email`, `owner` | Shown on the Contact, About, and Privacy pages |
+| `adsensePublisherId` | Leave empty until AdSense approves you, then paste e.g. `ca-pub-1234567890123456` |
+| `adSlotGameBottom` | Optional AdSense ad unit ID shown under each game |
+| `googleSiteVerification` | Paste your Google Search Console verification token here |
+| `bingSiteVerification` | Paste your Bing Webmaster Tools verification token here |
+| `twitterHandle` | Optional — your `@handle` for `twitter:site` tags |
 
 ## Run locally
 
@@ -56,11 +61,59 @@ Open the address `serve` prints.
    git remote add origin https://github.com/<your-username>/web-arcade.git
    git push -u origin main
    ```
-3. On netlify.com choose **Add new site > Import an existing project > GitHub**, pick the repo. Settings are read from `netlify.toml` (build command `node build.mjs`, publish directory `dist`). Click Deploy.
+3. On netlify.com choose **Add new site › Import an existing project › GitHub**, pick the repo. Settings are read from `netlify.toml` (build command `node build.mjs`, publish directory `dist`). Click Deploy.
 4. Copy your `https://<name>.netlify.app` URL into `site.config.json` as `url`, commit and push.
+
+## Generating thumbnails
+
+The build uses `games/<slug>/thumbnail.png` (640×400) as the card image and Open Graph image for each game. To auto-generate them with a headless browser:
+
+```bash
+# One-time setup (Playwright is only needed for thumbnails)
+npm install -D playwright
+npx playwright install chromium
+
+# Generate thumbnails for all games that don't have one yet
+node build.mjs            # build dist/ first
+node scripts/make-thumbnails.mjs
+
+# Rebuild and push with the new thumbnails
+node build.mjs
+git add games/
+git commit -m "Add game thumbnails"
+git push
+```
+
+The script skips any game that already has a `thumbnail.png`. Delete the file and re-run to regenerate it.
+
+## After deploying — SEO checklist
+
+Complete these steps **once** after your first live deploy:
+
+### 1. Google Search Console
+1. Go to [search.google.com/search-console](https://search.google.com/search-console) and click **Add property**.
+2. Enter your full URL (e.g. `https://play-zone-arcade.netlify.app`).
+3. Choose the **HTML tag** verification method. Copy the `content="..."` value from the meta tag shown.
+4. Open `site.config.json` and paste it as `"googleSiteVerification": "<your-token>"`.
+5. Run `node build.mjs`, commit, and push. Netlify will redeploy with the tag in every page.
+6. Back in Search Console, click **Verify**.
+7. Go to **Sitemaps** and submit: `https://play-zone-arcade.netlify.app/sitemap.xml`
+8. Go to **URL Inspection** and request indexing for:
+   - `https://play-zone-arcade.netlify.app/`
+   - `https://play-zone-arcade.netlify.app/games/snake/`
+   - (and each new game page you add)
+
+### 2. Bing Webmaster Tools
+1. Go to [bing.com/webmasters](https://www.bing.com/webmasters) and add your site.
+2. Choose the **Meta tag** verification method. Copy the `content="..."` value.
+3. Paste it as `"bingSiteVerification": "<your-token>"` in `site.config.json`.
+4. Commit, push, verify in Bing, then submit the sitemap URL there too.
+
+### 3. Social sharing preview
+Test your Open Graph tags at [opengraph.xyz](https://www.opengraph.xyz) or [cards-dev.twitter.com/validator](https://cards-dev.twitter.com/validator). They should show your branded image and title.
 
 ## Later: custom domain and AdSense
 
-- Buy a domain and add it under Netlify > Domain management. Update `url` in `site.config.json`.
+- Buy a domain and add it under Netlify › Domain management. Update `url` in `site.config.json`.
 - Apply at adsense.google.com once you have around 10+ games or pages with real content. Paste your publisher ID into `site.config.json` after approval.
 - Only publish games you made or have written permission to host.

@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#07080f"/>
+      <stop offset="100%" stop-color="#131628"/>
+    </linearGradient>
+    <linearGradient id="title" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="60%" stop-color="#00e5ff"/>
+      <stop offset="100%" stop-color="#ff2d78"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Grid lines -->
+  <g stroke="#00e5ff" stroke-width="1" opacity="0.04">
+    <line x1="0" y1="60" x2="1200" y2="60"/>
+    <line x1="0" y1="120" x2="1200" y2="120"/>
+    <line x1="0" y1="180" x2="1200" y2="180"/>
+    <line x1="0" y1="240" x2="1200" y2="240"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/>
+    <line x1="0" y1="360" x2="1200" y2="360"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="480" x2="1200" y2="480"/>
+    <line x1="0" y1="540" x2="1200" y2="540"/>
+    <line x1="60" y1="0" x2="60" y2="630"/>
+    <line x1="120" y1="0" x2="120" y2="630"/>
+    <line x1="180" y1="0" x2="180" y2="630"/>
+    <line x1="240" y1="0" x2="240" y2="630"/>
+    <line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="360" y1="0" x2="360" y2="630"/>
+    <line x1="420" y1="0" x2="420" y2="630"/>
+    <line x1="480" y1="0" x2="480" y2="630"/>
+    <line x1="540" y1="0" x2="540" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="660" y1="0" x2="660" y2="630"/>
+    <line x1="720" y1="0" x2="720" y2="630"/>
+    <line x1="780" y1="0" x2="780" y2="630"/>
+    <line x1="840" y1="0" x2="840" y2="630"/>
+    <line x1="900" y1="0" x2="900" y2="630"/>
+    <line x1="960" y1="0" x2="960" y2="630"/>
+    <line x1="1020" y1="0" x2="1020" y2="630"/>
+    <line x1="1080" y1="0" x2="1080" y2="630"/>
+    <line x1="1140" y1="0" x2="1140" y2="630"/>
+  </g>
+
+  <!-- Glow orb -->
+  <radialGradient id="orb" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.25"/>
+    <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+  </radialGradient>
+  <ellipse cx="600" cy="315" rx="400" ry="300" fill="url(#orb)"/>
+
+  <!-- Top accent line -->
+  <rect x="0" y="0" width="1200" height="4" fill="url(#title)"/>
+
+  <!-- Play icon -->
+  <circle cx="600" cy="220" r="60" fill="rgba(0,229,255,0.08)" stroke="#00e5ff" stroke-width="2" filter="url(#glow)"/>
+  <polygon points="585,196 585,244 628,220" fill="#00e5ff" filter="url(#glow)"/>
+
+  <!-- Site name -->
+  <text x="600" y="340" text-anchor="middle"
+    font-family="'Arial Black', 'Impact', sans-serif"
+    font-size="88" font-weight="900" letter-spacing="4"
+    fill="url(#title)">PLAY ZONE</text>
+
+  <!-- Tagline -->
+  <text x="600" y="400" text-anchor="middle"
+    font-family="Arial, sans-serif"
+    font-size="28" fill="#7b82b0" letter-spacing="1">
+    Free browser games. No download, just play.
+  </text>
+
+  <!-- Bottom badge -->
+  <rect x="460" y="470" width="280" height="44" rx="22"
+    fill="rgba(0,229,255,0.1)" stroke="#00e5ff" stroke-width="1.5" opacity="0.8"/>
+  <text x="600" y="498" text-anchor="middle"
+    font-family="Arial, sans-serif" font-size="18" font-weight="700"
+    fill="#00e5ff" letter-spacing="2">PLAY FOR FREE</text>
+
+  <!-- Bottom accent line -->
+  <rect x="0" y="626" width="1200" height="4" fill="url(#title)"/>
+</svg>
+

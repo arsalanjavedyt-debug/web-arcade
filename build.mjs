@@ -7,6 +7,7 @@ const ROOT = process.cwd();
 const DIST = path.join(ROOT, 'dist');
 const config = JSON.parse(await readFile(path.join(ROOT, 'site.config.json'), 'utf8'));
 const SITE_URL = config.url.replace(/\/$/, '');
+const TODAY = new Date().toISOString().slice(0, 10);
 
 const esc = (s = '') =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -36,21 +37,109 @@ async function loadGames() {
       category: meta.category || 'Arcade',
       icon: meta.icon || '🎮',
       hasThumb: await exists(path.join(folder, 'thumbnail.png')),
-      added: meta.added || '',
+      added: meta.added || TODAY,
       folder,
     });
   }
-  // newest first if dates are given, otherwise alphabetical
   games.sort((a, b) => (b.added || '').localeCompare(a.added || '') || a.title.localeCompare(b.title));
   return games;
 }
 
-// ---------- layout ----------
+// ---------- helpers ----------
 const adsenseTag = config.adsensePublisherId
   ? `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${esc(config.adsensePublisherId)}" crossorigin="anonymous"></script>`
   : '';
 
-function layout({ title, description, pathName, body }) {
+const adSlot = (id) =>
+  config.adsensePublisherId && id
+    ? `<div class="ad-slot"><ins class="adsbygoogle" style="display:block" data-ad-client="${esc(config.adsensePublisherId)}" data-ad-slot="${esc(id)}" data-ad-format="auto" data-full-width-responsive="true"></ins><script>(adsbygoogle=window.adsbygoogle||[]).push({});</script></div>`
+    : '';
+
+function verificationTags() {
+  let t = '';
+  if (config.googleSiteVerification)
+    t += `\n<meta name="google-site-verification" content="${esc(config.googleSiteVerification)}">`;
+  if (config.bingSiteVerification)
+    t += `\n<meta name="msvalidate.01" content="${esc(config.bingSiteVerification)}">`;
+  return t;
+}
+
+function socialTags({ title, description, image, url, type = 'website' }) {
+  const img = image || `${SITE_URL}/assets/og-default.png`;
+  let t = `
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(description)}">
+<meta property="og:type" content="${type}">
+<meta property="og:url" content="${esc(url)}">
+<meta property="og:site_name" content="${esc(config.name)}">
+<meta property="og:image" content="${esc(img)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(title)}">
+<meta name="twitter:description" content="${esc(description)}">
+<meta name="twitter:image" content="${esc(img)}">`;
+  if (config.twitterHandle)
+    t += `\n<meta name="twitter:site" content="${esc(config.twitterHandle)}">`;
+  return t;
+}
+
+function jsonLd(data) {
+  return `<script type="application/ld+json">${JSON.stringify(data, null, 2)}</script>`;
+}
+
+function websiteSchema() {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: config.name,
+    url: SITE_URL,
+    description: config.tagline,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${SITE_URL}/?q={search_term_string}`,
+      'query-input': 'required name=search_term_string'
+    }
+  });
+}
+
+function videoGameSchema(g) {
+  const base = {
+    '@context': 'https://schema.org',
+    '@type': 'VideoGame',
+    name: g.title,
+    description: g.description,
+    url: `${SITE_URL}/games/${g.slug}/`,
+    genre: g.category,
+    applicationCategory: 'Game',
+    operatingSystem: 'Any',
+    gamePlatform: 'Web browser',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock'
+    },
+    author: { '@type': 'Person', name: config.owner }
+  };
+  if (g.hasThumb) base.image = `${SITE_URL}/play/${g.slug}/thumbnail.png`;
+  if (g.added) base.datePublished = g.added;
+  return jsonLd(base);
+}
+
+function breadcrumbSchema(g) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: g.title, item: `${SITE_URL}/games/${g.slug}/` }
+    ]
+  });
+}
+
+// ---------- layout ----------
+function layout({ title, description, pathName, body, extraHead = '' }) {
   const fullTitle = pathName === '/' ? `${config.name} - ${config.tagline}` : `${title} | ${config.name}`;
   const navLinks = [['/', 'Games'], ['/about/', 'About'], ['/contact/', 'Contact']];
   const nav = navLinks.map(([href, label]) =>
@@ -61,16 +150,15 @@ function layout({ title, description, pathName, body }) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#07080f">
 <title>${esc(fullTitle)}</title>
-<meta name="description" content="${esc(description)}">
+<meta name="description" content="${esc(description)}">${verificationTags()}
 <link rel="canonical" href="${SITE_URL}${pathName}">
-<meta property="og:title" content="${esc(fullTitle)}">
-<meta property="og:description" content="${esc(description)}">
-<meta property="og:type" content="website">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="/assets/style.css">
-${adsenseTag}
+${adsenseTag}${extraHead}
 </head>
 <body>
 <header class="site"><div class="wrap">
@@ -110,21 +198,15 @@ ${body}
 </html>`;
 }
 
-const adSlot = (id) =>
-  config.adsensePublisherId && id
-    ? `<div class="ad-slot"><ins class="adsbygoogle" style="display:block" data-ad-client="${esc(config.adsensePublisherId)}" data-ad-slot="${esc(id)}" data-ad-format="auto" data-full-width-responsive="true"></ins><script>(adsbygoogle=window.adsbygoogle||[]).push({});</script></div>`
-    : '';
-
+// ---------- cards ----------
 function isNewGame(g) {
   if (!g.added) return false;
-  const d = new Date(g.added);
-  const now = new Date();
-  return (now - d) < 1000 * 60 * 60 * 24 * 30;
+  return (Date.now() - new Date(g.added)) < 1000 * 60 * 60 * 24 * 30;
 }
 
 function card(g, forceNew = false) {
   const thumb = g.hasThumb
-    ? `<img src="/play/${g.slug}/thumbnail.png" alt="${esc(g.title)}" loading="lazy">`
+    ? `<img src="/play/${g.slug}/thumbnail.png" alt="${esc(g.title)} game screenshot" loading="lazy" width="640" height="400">`
     : `<span style="filter:drop-shadow(0 0 12px rgba(0,229,255,.5))">${g.icon}</span>`;
   const newBadge = (forceNew || isNewGame(g)) ? ' is-new' : '';
   return `<a class="card${newBadge}" href="/games/${g.slug}/">
@@ -143,6 +225,14 @@ function card(g, forceNew = false) {
 // ---------- pages ----------
 function homePage(games) {
   const gameCount = games.length;
+  const extraHead = `
+${socialTags({
+  title: `${config.name} - ${config.tagline}`,
+  description: `${config.tagline} Play ${gameCount} free games online — no download, no login.`,
+  url: `${SITE_URL}/`,
+})}
+${websiteSchema()}`;
+
   const body = `
 <div class="wrap">
 <section class="hero">
@@ -182,16 +272,43 @@ function homePage(games) {
 <hr class="glow-line">
 
 <section style="max-width:600px;margin:0 auto 60px;text-align:center">
-  <h2 class="block" style="font-family:var(--font-head);font-size:1.7rem;font-weight:700;text-transform:uppercase;margin-bottom:12px">Play Free Games Online</h2>
+  <h2 style="font-family:var(--font-head);font-size:1.7rem;font-weight:700;text-transform:uppercase;margin-bottom:12px">Play Free Games Online</h2>
   <p style="color:var(--muted)">${esc(config.name)} is a growing collection of free browser games that run on your phone, tablet or computer. There is nothing to install &mdash; pick a game, press play, and try to beat your best score.</p>
 </section>
 </div>`;
-  return layout({ title: config.name, description: `${config.tagline} Play ${gameCount} free games online.`, pathName: '/', body });
+
+  return layout({
+    title: config.name,
+    description: `${config.tagline} Play ${gameCount} free games online — no download, no login.`,
+    pathName: '/',
+    body,
+    extraHead,
+  });
 }
 
 function gamePage(g, games) {
-  const others = games.filter((x) => x.slug !== g.slug).slice(0, 4);
-  const listItems = (arr) => arr.map((i) => `<li>${esc(i)}</li>`).join('');
+  // Related: same category first, then others, max 6
+  const related = [
+    ...games.filter(x => x.slug !== g.slug && x.category === g.category),
+    ...games.filter(x => x.slug !== g.slug && x.category !== g.category),
+  ].slice(0, 6);
+
+  const listItems = (arr) => arr.map(i => `<li>${esc(i)}</li>`).join('');
+  const ogImage = g.hasThumb
+    ? `${SITE_URL}/play/${g.slug}/thumbnail.png`
+    : `${SITE_URL}/assets/og-default.png`;
+
+  const extraHead = `
+${socialTags({
+  title: `${g.title} - Play Free Online | ${config.name}`,
+  description: g.description,
+  image: ogImage,
+  url: `${SITE_URL}/games/${g.slug}/`,
+  type: 'website',
+})}
+${videoGameSchema(g)}
+${breadcrumbSchema(g)}`;
+
   const body = `
 <div class="wrap">
 <div class="crumbs"><a href="/">Games</a> <span>&rsaquo;</span> ${esc(g.title)}</div>
@@ -201,7 +318,7 @@ function gamePage(g, games) {
 <div class="game-layout">
   <div>
     <div class="player">
-      <iframe id="game" src="/play/${g.slug}/" title="${esc(g.title)}" allow="fullscreen; gamepad" loading="eager"></iframe>
+      <iframe id="game" src="/play/${g.slug}/" title="${esc(g.title)} — free online ${esc(g.category).toLowerCase()} game" allow="fullscreen; gamepad" loading="eager"></iframe>
       <div class="bar">
         <span>${esc(g.category)} Game</span>
         <button class="btn" onclick="document.getElementById('game').requestFullscreen&&document.getElementById('game').requestFullscreen()">&#x26F6; Fullscreen</button>
@@ -221,20 +338,29 @@ function gamePage(g, games) {
       <h3>Details</h3>
       <ul>
         <li>Category: ${esc(g.category)}</li>
-        <li>Platform: Browser</li>
+        <li>Platform: Browser (Any device)</li>
         <li>Price: Free</li>
+        ${g.added ? `<li>Added: ${esc(g.added)}</li>` : ''}
       </ul>
     </div>
   </aside>
 </div>
 
-${others.length ? `<section><div class="section-head"><h2>More Games</h2></div><div class="grid">${others.map(x => card(x)).join('')}</div></section>` : ''}
+${related.length ? `<section><div class="section-head"><h2>More Games</h2></div><div class="grid">${related.map(x => card(x)).join('')}</div></section>` : ''}
 </div>`;
-  return layout({ title: `${g.title} - Play Free Online`, description: g.description, pathName: `/games/${g.slug}/`, body });
+
+  return layout({
+    title: `${g.title} - Play Free Online`,
+    description: g.description,
+    pathName: `/games/${g.slug}/`,
+    body,
+    extraHead,
+  });
 }
 
-const staticPage = (title, pathName, description, inner) =>
-  layout({ title, description, pathName, body: `<div class="wrap"><article class="prose"><h1>${esc(title)}</h1>${inner}</article></div>` });
+// ---------- static pages ----------
+const staticPage = (title, pathName, description, inner, extraHead = '') =>
+  layout({ title, description, pathName, extraHead: `\n${socialTags({ title: `${title} | ${config.name}`, description, url: `${SITE_URL}${pathName}` })}${extraHead}`, body: `<div class="wrap"><article class="prose"><h1>${esc(title)}</h1>${inner}</article></div>` });
 
 const aboutPage = () =>
   staticPage('About', '/about/', `About ${config.name}`, `
@@ -248,12 +374,12 @@ const contactPage = () =>
 
 const privacyPage = () =>
   staticPage('Privacy Policy', '/privacy/', `Privacy Policy for ${config.name}`, `
-<p>Last updated: ${new Date().toISOString().slice(0, 10)}</p>
+<p>Last updated: ${TODAY}</p>
 <p>${esc(config.name)} ("we", "us") respects your privacy. This policy explains what information is collected when you visit our website.</p>
 <h2>Information we collect</h2>
 <p>We do not ask you to create an account or submit personal information to play games. Like most websites, our hosting provider may record standard log data such as IP address, browser type and pages visited.</p>
 <h2>Cookies and advertising</h2>
-<p>We use Google AdSense to show ads. Google and its partners use cookies to serve ads based on your prior visits to this and other websites. You can opt out of personalised advertising by visiting <a href="https://www.google.com/settings/ads">Google Ads Settings</a>, or learn more at <a href="https://www.aboutads.info">aboutads.info</a>. Google's use of advertising cookies is described in the <a href="https://policies.google.com/technologies/ads">Google advertising policy</a>.</p>
+<p>We use Google AdSense to show ads. Google and its partners use cookies to serve ads based on your prior visits to this and other websites. You can opt out of personalised advertising by visiting <a href="https://www.google.com/settings/ads">Google Ads Settings</a>, or learn more at <a href="https://www.aboutads.info">aboutads.info</a>.</p>
 <h2>Local storage</h2>
 <p>Some games save your high score in your browser's local storage. This data stays on your device and is never sent to us.</p>
 <h2>Children</h2>
@@ -266,6 +392,21 @@ const privacyPage = () =>
 const notFoundPage = () =>
   layout({ title: 'Page not found', description: 'Page not found', pathName: '/404.html',
     body: `<div class="wrap" style="text-align:center;padding:80px 20px"><p style="font-family:var(--font-head);font-size:7rem;font-weight:700;color:var(--surface-2);line-height:1;margin:0">404</p><p style="color:var(--muted);margin:16px 0 24px;font-size:1.1rem">That page does not exist.</p><a class="btn-primary" href="/">&#8592; Back to Games</a></div>` });
+
+// ---------- sitemap with lastmod ----------
+function buildSitemap(games) {
+  const pages = [
+    { url: '/', date: TODAY },
+    { url: '/about/', date: TODAY },
+    { url: '/contact/', date: TODAY },
+    { url: '/privacy/', date: TODAY },
+    ...games.map(g => ({ url: `/games/${g.slug}/`, date: g.added || TODAY })),
+  ];
+  const urls = pages.map(p =>
+    `  <url>\n    <loc>${SITE_URL}${p.url}</loc>\n    <lastmod>${p.date}</lastmod>\n    <changefreq>${p.url === '/' ? 'weekly' : 'monthly'}</changefreq>\n  </url>`
+  ).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+}
 
 // ---------- build ----------
 async function write(rel, content) {
@@ -289,9 +430,7 @@ await write('contact/index.html', contactPage());
 await write('privacy/index.html', privacyPage());
 await write('404.html', notFoundPage());
 
-const urls = ['/', '/about/', '/contact/', '/privacy/', ...games.map((g) => `/games/${g.slug}/`)];
-await write('sitemap.xml',
-  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${SITE_URL}${u}</loc></url>`).join('\n')}\n</urlset>\n`);
+await write('sitemap.xml', buildSitemap(games));
 await write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`);
 
 if (config.adsensePublisherId) {
