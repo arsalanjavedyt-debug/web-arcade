@@ -265,3 +265,4 @@ class SoundEngine {
 
 // Global Singleton
 window.NexoraSound = new SoundEngine();
+

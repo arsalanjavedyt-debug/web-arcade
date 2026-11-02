@@ -285,3 +285,4 @@ class GuestManager {
 
 // Global Singleton
 window.NexoraGuest = new GuestManager();
+

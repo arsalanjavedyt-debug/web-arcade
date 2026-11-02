@@ -195,3 +195,4 @@ class NexoraMultiplayerClient {
 }
 
 window.NexoraMP = new NexoraMultiplayerClient();
+

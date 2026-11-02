@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" fill="none">
   <defs>
     <linearGradient id="nxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00D9FF"/>
-      <stop offset="50%" stop-color="#9B5CFF"/>
-      <stop offset="100%" stop-color="#49F5A0"/>
+      <stop offset="0%" stop-color="#06B6D4"/>
+      <stop offset="50%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#A3FF12"/>
     </linearGradient>
     <linearGradient id="purpleGlow" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#9B5CFF"/>
-      <stop offset="100%" stop-color="#00D9FF"/>
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
     </linearGradient>
     <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="3" result="blur" />
@@ -18,28 +18,28 @@
   <!-- Hexagonal Shield Icon -->
   <g transform="translate(8, 6)">
     <!-- Outer Hex Border -->
-    <polygon points="26,2 48,14 48,38 26,50 4,38 4,14" fill="#11131B" stroke="url(#nxGrad)" stroke-width="2.5" filter="url(#glow)"/>
-    <polygon points="26,6 44,16 44,36 26,46 8,36 8,16" fill="#171A25" stroke="#9B5CFF" stroke-width="1" opacity="0.6"/>
+    <polygon points="26,2 48,14 48,38 26,50 4,38 4,14" fill="#10121A" stroke="url(#nxGrad)" stroke-width="2.5" filter="url(#glow)"/>
+    <polygon points="26,6 44,16 44,36 26,46 8,36 8,16" fill="#151824" stroke="#8B5CF6" stroke-width="1" opacity="0.6"/>
     
     <!-- Stylized 'N' Glyph with Energy Slash -->
     <path d="M16 36 L16 16 L22 16 L34 32 L34 16 L38 16 L38 36 L32 36 L20 20 L20 36 Z" fill="url(#nxGrad)" />
     <!-- Core diamond node -->
-    <polygon points="26,24 29,26 26,28 23,26" fill="#49F5A0" />
+    <polygon points="26,24 29,26 26,28 23,26" fill="#A3FF12" />
   </g>
 
   <!-- Wordmark -->
   <g transform="translate(68, 14)">
     <!-- NEXORA -->
-    <text x="0" y="26" font-family="'Inter', 'Segoe UI', system-ui, sans-serif" font-weight="900" font-size="26" letter-spacing="3" fill="#F5F6FA">
+    <text x="0" y="26" font-family="'Outfit', -apple-system, system-ui, sans-serif" font-weight="900" font-size="26" letter-spacing="3" fill="#F5F7FF">
       NEX<tspan fill="url(#purpleGlow)">O</tspan>RA
     </text>
     <!-- PLAY BADGE -->
     <rect x="136" y="7" width="62" height="23" rx="4" fill="url(#nxGrad)" opacity="0.95"/>
-    <text x="167" y="23" text-anchor="middle" font-family="'Inter', 'Segoe UI', system-ui, sans-serif" font-weight="900" font-size="12" letter-spacing="2" fill="#08090D">
+    <text x="167" y="23" text-anchor="middle" font-family="'Outfit', -apple-system, system-ui, sans-serif" font-weight="900" font-size="12" letter-spacing="2" fill="#08090D">
       PLAY
     </text>
     <!-- SUBTITLE -->
-    <text x="2" y="39" font-family="'Inter', 'Segoe UI', system-ui, sans-serif" font-weight="600" font-size="7.5" letter-spacing="2.8" fill="#969BAD">
+    <text x="2" y="39" font-family="'Inter', system-ui, sans-serif" font-weight="600" font-size="7.5" letter-spacing="2.8" fill="#9CA3B8">
       PLAY INSTANTLY • COMPETE GLOBALLY
     </text>
   </g>

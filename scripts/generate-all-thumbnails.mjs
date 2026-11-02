@@ -288,3 +288,4 @@ games.forEach(g => {
 });
 
 console.log('All 10 thumbnails successfully created.');
+
