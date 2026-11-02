@@ -1,0 +1,20 @@
+{
+  "title": "Turbo Kart Battle",
+  "description": "High-velocity top-down kart racing combat! Drift tight neon chicanes, grab combat power-ups like homing rockets and speed boosts, and blast your way to the podium.",
+  "category": "Multiplayer",
+  "difficulty": "Medium",
+  "duration": "3 min",
+  "icon": "🏎️",
+  "isMultiplayer": true,
+  "added": "2026-11-02",
+  "instructions": [
+    "Steer your turbo kart through 3 intense laps on the neon circuit.",
+    "Drive over mystery weapon crates to pick up Rockets, Boosts, Shields, and Mines.",
+    "Fire rockets at leaders ahead of you and drop mines to block chasers.",
+    "Finish in 1st place to claim the Grand Prix Championship!"
+  ],
+  "controls": [
+    "Arrow Keys / WASD / Touch Buttons: Steer, Accelerate & Reverse",
+    "Space / Power-up Button: Deploy equipped weapon"
+  ]
+}

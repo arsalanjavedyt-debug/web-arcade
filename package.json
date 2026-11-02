@@ -1,13 +1,15 @@
 {
-  "name": "web-arcade",
-  "version": "1.0.0",
+  "name": "nexora-play",
+  "version": "2.0.0",
+  "description": "NEXORA PLAY — Complete Premium Browser Gaming Platform",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "dev": "node build.mjs && npx serve dist",
+    "thumbnails": "node scripts/generate-all-thumbnails.mjs",
     "start": "node server.js",
-    "multiplayer": "node server.js"
+    "dev": "node server.js",
+    "test": "node scripts/test-platform.mjs"
   },
   "dependencies": {
     "express": "^5.3.0",

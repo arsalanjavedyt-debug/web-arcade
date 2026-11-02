@@ -1,0 +1,21 @@
+{
+  "title": "Word Detective",
+  "description": "Unravel the secret 5-letter cipher in 6 attempts! Analyze color-coded clues, deduce letter placements with logic, and build a master deduction streak.",
+  "category": "Puzzle",
+  "difficulty": "Medium",
+  "duration": "3-5 min",
+  "icon": "🔍",
+  "isMultiplayer": false,
+  "added": "2026-11-02",
+  "instructions": [
+    "Guess the secret 5-letter mystery word within 6 tries.",
+    "GREEN: Letter is in the word and in the exact correct position.",
+    "YELLOW: Letter is in the word, but in a different position.",
+    "DARK GRAY: Letter does not exist in the secret word."
+  ],
+  "controls": [
+    "Physical Keyboard / Touch On-Screen Keyboard: Type letters",
+    "Enter: Submit word guess",
+    "Backspace / ⌫: Delete letter"
+  ]
+}

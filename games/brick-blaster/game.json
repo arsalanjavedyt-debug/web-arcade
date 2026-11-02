@@ -1,0 +1,20 @@
+{
+  "title": "Brick Blaster",
+  "description": "The definitive retro-futuristic breakout experience! Shatter prismatic block formations, collect dynamic power-ups like multi-ball & laser cannons, and clear challenging stages.",
+  "category": "Arcade",
+  "difficulty": "Medium",
+  "duration": "3-5 min",
+  "icon": "🧱",
+  "isMultiplayer": false,
+  "added": "2026-11-02",
+  "instructions": [
+    "Move your cyber paddle horizontally to deflect the energy orb.",
+    "Destroy all bricks in each formation to advance to subsequent stages.",
+    "Catch falling power-up capsules to trigger Multi-Ball, Paddle Extension, Laser Cannons, and Explosive Orbs.",
+    "Don't let the ball plunge below your paddle boundary!"
+  ],
+  "controls": [
+    "Mouse / Touch Drag: Move paddle left and right",
+    "Space / Tap: Launch ball or fire laser cannons"
+  ]
+}

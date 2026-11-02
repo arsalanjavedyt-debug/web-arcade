@@ -1,0 +1,19 @@
+{
+  "title": "Memory Masters",
+  "description": "Sharpen your photographic recall! Match hidden pairs of holographic neon symbols, chain rapid discoveries for combo bonuses, and clear the memory matrix against the clock.",
+  "category": "Puzzle",
+  "difficulty": "Easy",
+  "duration": "2-3 min",
+  "icon": "🧠",
+  "isMultiplayer": false,
+  "added": "2026-11-02",
+  "instructions": [
+    "Click or tap cards to flip them over and reveal their hidden cyber glyphs.",
+    "Uncover two identical symbols in succession to lock them in as a matched pair.",
+    "Chain consecutive matches together to build an immense combo multiplier.",
+    "Clear all 8 pairs before the round timer reaches zero!"
+  ],
+  "controls": [
+    "Mouse Click / Mobile Tap: Flip cards"
+  ]
+}

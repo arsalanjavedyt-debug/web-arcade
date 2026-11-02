@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Word Detective</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body, html { width: 100%; height: 100%; overflow: hidden; background: #08090D; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+  .detective-wrap { width: 100%; max-width: 460px; height: 100%; max-height: 720px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
+
+  .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .title-group h1 { font-size: 24px; font-weight: 900; background: linear-gradient(135deg, #49F5A0, #00D9FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .title-group p { font-size: 12px; color: #969BAD; }
+
+  .streak-badge { background: #171A25; border: 1px solid rgba(255, 255, 255, 0.1); padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 700; color: #FFB800; display: flex; align-items: center; gap: 6px; }
+
+  /* 6 Rows x 5 Columns Grid */
+  .word-grid { display: grid; grid-template-rows: repeat(6, 1fr); gap: 7px; margin: 0 auto; width: 100%; max-width: 320px; flex: 1; max-height: 380px; }
+  .grid-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+  .letter-cell { border: 2px solid rgba(255, 255, 255, 0.12); border-radius: 8px; background: #11131B; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 26px; font-weight: 800; text-transform: uppercase; transition: transform 0.2s, background 0.4s, border-color 0.4s; }
+  .letter-cell.pop { transform: scale(1.1); border-color: #00D9FF; }
+
+  /* Letter states */
+  .cell-correct { background: #49F5A0 !important; color: #08090D !important; border-color: #49F5A0 !important; }
+  .cell-present { background: #FFB800 !important; color: #08090D !important; border-color: #FFB800 !important; }
+  .cell-absent { background: #1E2232 !important; color: #5E6375 !important; border-color: transparent !important; }
+
+  /* On-Screen Keyboard */
+  .keyboard-wrap { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 10px; }
+  .kb-row { display: flex; justify-content: center; gap: 5px; }
+  .kb-key { background: #171A25; border: 1px solid rgba(255, 255, 255, 0.08); color: #fff; font-family: monospace; font-size: 14px; font-weight: 700; padding: 12px 0; border-radius: 6px; cursor: pointer; flex: 1; max-width: 38px; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
+  .kb-key:active { transform: scale(0.92); }
+  .kb-key.wide { max-width: 58px; font-size: 12px; }
+  .key-correct { background: #49F5A0; color: #08090D; }
+  .key-present { background: #FFB800; color: #08090D; }
+  .key-absent { background: #171A25; opacity: 0.35; }
+
+  /* Toast Alert */
+  #toast { position: absolute; top: 75px; left: 50%; transform: translateX(-50%); background: #FF3366; color: #fff; font-weight: 700; font-size: 13px; padding: 8px 18px; border-radius: 8px; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; z-index: 50; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="detective-wrap">
+  <div class="header-bar">
+    <div class="title-group">
+      <h1>WORD DETECTIVE</h1>
+      <p>Decipher the 5-letter password</p>
+    </div>
+    <div class="streak-badge">🔥 Streak: <span id="streak-val">0</span></div>
+  </div>
+
+  <div id="toast">Word not in dictionary!</div>
+
+  <div class="word-grid" id="grid"></div>
+
+  <div class="keyboard-wrap" id="keyboard"></div>
+</div>
+
+<script>
+(() => {
+  const gridEl = document.getElementById('grid');
+  const kbEl = document.getElementById('keyboard');
+  const toast = document.getElementById('toast');
+  const streakVal = document.getElementById('streak-val');
+
+  function playSound(type) {
+    if (window.parent && window.parent.NexoraSound) {
+      if (type === 'tap') window.parent.NexoraSound.playClick();
+      if (type === 'flip') window.parent.NexoraSound.playHit();
+      if (type === 'win') window.parent.NexoraSound.playWin();
+      if (type === 'over') window.parent.NexoraSound.playGameOver();
+    }
+  }
+
+  // Dictionary bank
+  const WORDS = [
+    'CYBER', 'SOLAR', 'PIXEL', 'GHOST', 'LASER', 'RADAR', 'BLAZE', 'PULSE', 'NEXUS', 'VORTX',
+    'ORBIT', 'TITAN', 'STORM', 'SPARK', 'SHARK', 'VIPER', 'CLONE', 'DRIVE', 'FLASH', 'SPACE',
+    'MAGIC', 'POWER', 'FORCE', 'LIGHT', 'BRAIN', 'SHINE', 'SMART', 'SWIFT', 'QUEST', 'PRISM'
+  ];
+
+  let secretWord = WORDS[Math.floor(Math.random() * WORDS.length)];
+  let currentRow = 0;
+  let currentTile = 0;
+  let currentGuess = '';
+  let isGameOver = false;
+  let streak = 0;
+
+  // Build 6x5 Grid
+  for (let r = 0; r < 6; r++) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'grid-row';
+    for (let c = 0; c < 5; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'letter-cell';
+      cell.id = `cell-${r}-${c}`;
+      rowEl.appendChild(cell);
+    }
+    gridEl.appendChild(rowEl);
+  }
+
+  // Build Keyboard
+  const KB_LAYOUT = [
+    ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+    ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+    ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '⌫']
+  ];
+
+  KB_LAYOUT.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'kb-row';
+    row.forEach(key => {
+      const btn = document.createElement('div');
+      btn.className = `kb-key ${key.length > 1 ? 'wide' : ''}`;
+      btn.textContent = key;
+      btn.dataset.key = key;
+      btn.addEventListener('click', () => handleKey(key));
+      rowEl.appendChild(btn);
+    });
+    kbEl.appendChild(rowEl);
+  });
+
+  function handleKey(key) {
+    if (isGameOver) return;
+    playSound('tap');
+
+    if (key === 'ENTER') {
+      submitGuess();
+    } else if (key === '⌫' || key === 'BACKSPACE') {
+      if (currentGuess.length > 0) {
+        currentGuess = currentGuess.slice(0, -1);
+        currentTile--;
+        const cell = document.getElementById(`cell-${currentRow}-${currentTile}`);
+        cell.textContent = '';
+        cell.classList.remove('pop');
+      }
+    } else if (/^[A-Z]$/.test(key) && currentGuess.length < 5) {
+      currentGuess += key;
+      const cell = document.getElementById(`cell-${currentRow}-${currentTile}`);
+      cell.textContent = key;
+      cell.classList.add('pop');
+      currentTile++;
+    }
+  }
+
+  window.addEventListener('keydown', e => {
+    let k = e.key.toUpperCase();
+    if (k === 'ENTER') handleKey('ENTER');
+    else if (k === 'BACKSPACE') handleKey('⌫');
+    else if (/^[A-Z]$/.test(k)) handleKey(k);
+  });
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+
+  function submitGuess() {
+    if (currentGuess.length < 5) {
+      showToast('Need 5 letters!');
+      return;
+    }
+
+    // Evaluate clues
+    const guessArr = currentGuess.split('');
+    const secretArr = secretWord.split('');
+    const status = Array(5).fill('cell-absent');
+
+    // First pass: Greens (Exact matches)
+    for (let i = 0; i < 5; i++) {
+      if (guessArr[i] === secretArr[i]) {
+        status[i] = 'cell-correct';
+        secretArr[i] = null;
+      }
+    }
+
+    // Second pass: Yellows (Presents)
+    for (let i = 0; i < 5; i++) {
+      if (status[i] === 'cell-absent') {
+        const foundIdx = secretArr.indexOf(guessArr[i]);
+        if (foundIdx !== -1) {
+          status[i] = 'cell-present';
+          secretArr[foundIdx] = null;
+        }
+      }
+    }
+
+    // Animate row
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        const cell = document.getElementById(`cell-${currentRow}-${i}`);
+        cell.className = `letter-cell ${status[i]}`;
+        playSound('flip');
+
+        // Color keyboard
+        const keyBtn = document.querySelector(`.kb-key[data-key="${guessArr[i]}"]`);
+        if (keyBtn) {
+          if (status[i] === 'cell-correct') {
+            keyBtn.className = 'kb-key key-correct';
+          } else if (status[i] === 'cell-present' && !keyBtn.classList.contains('key-correct')) {
+            keyBtn.className = 'kb-key key-present';
+          } else if (!keyBtn.classList.contains('key-correct') && !keyBtn.classList.contains('key-present')) {
+            keyBtn.className = 'kb-key key-absent';
+          }
+        }
+      }, i * 150);
+    }
+
+    setTimeout(() => {
+      if (currentGuess === secretWord) {
+        // Win!
+        isGameOver = true;
+        streak++;
+        streakVal.textContent = streak;
+        const score = (6 - currentRow) * 100;
+        showToast(`GENIUS! +${score} PTS 🎉`);
+        playSound('win');
+
+        if (window.parent && window.parent.NexoraGuest) {
+          window.parent.NexoraGuest.recordGameScore('word-detective', score);
+        }
+        setTimeout(resetGame, 3000);
+      } else if (currentRow === 5) {
+        // Loss
+        isGameOver = true;
+        streak = 0;
+        streakVal.textContent = streak;
+        showToast(`The cipher was: ${secretWord}`);
+        playSound('over');
+        setTimeout(resetGame, 3500);
+      } else {
+        currentRow++;
+        currentTile = 0;
+        currentGuess = '';
+      }
+    }, 5 * 150 + 100);
+  }
+
+  function resetGame() {
+    secretWord = WORDS[Math.floor(Math.random() * WORDS.length)];
+    currentRow = 0;
+    currentTile = 0;
+    currentGuess = '';
+    isGameOver = false;
+
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 5; c++) {
+        const cell = document.getElementById(`cell-${r}-${c}`);
+        cell.className = 'letter-cell';
+        cell.textContent = '';
+      }
+    }
+
+    document.querySelectorAll('.kb-key').forEach(k => {
+      k.className = `kb-key ${k.dataset.key.length > 1 ? 'wide' : ''}`;
+    });
+  }
+})();
+</script>
+</body>
+</html>

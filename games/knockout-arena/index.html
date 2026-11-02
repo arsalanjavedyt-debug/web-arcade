@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Knockout Arena</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body, html { width: 100%; height: 100%; overflow: hidden; background: #08090D; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #fff; }
+  #canvas { display: block; width: 100%; height: 100%; }
+
+  .hud { position: absolute; pointer-events: none; }
+  .hud-top { top: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; }
+  .hud-pill { background: rgba(17, 19, 27, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(8px); padding: 8px 18px; border-radius: 9999px; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+  .hud-pill b { color: #00D9FF; font-family: monospace; }
+
+  /* Mobile Controls */
+  #touch-joy-zone { position: absolute; bottom: 20px; left: 20px; width: 140px; height: 140px; border-radius: 50%; border: 2px dashed rgba(255, 255, 255, 0.15); display: none; pointer-events: auto; }
+  #touch-joy-thumb { position: absolute; width: 50px; height: 50px; border-radius: 50%; background: #00D9FF; top: 45px; left: 45px; opacity: 0.8; pointer-events: none; }
+  #touch-dash-btn { position: absolute; bottom: 30px; right: 30px; width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #FF3366, #9B5CFF); border: 2px solid #fff; color: #fff; font-weight: 900; font-size: 14px; display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; display: none; box-shadow: 0 0 20px rgba(255, 51, 102, 0.5); }
+  #touch-dash-btn:active { transform: scale(0.92); }
+
+  /* Overlay Screens */
+  .screen { position: absolute; inset: 0; background: rgba(8, 9, 13, 0.85); backdrop-filter: blur(12px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; padding: 20px; }
+  .screen.hidden { display: none; }
+  .screen h1 { font-size: clamp(32px, 5vw, 48px); font-weight: 900; margin-bottom: 8px; background: linear-gradient(135deg, #FF3366, #9B5CFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .screen p { color: #969BAD; max-width: 440px; margin-bottom: 24px; font-size: 15px; }
+  .btn-play { background: linear-gradient(135deg, #FF3366, #9B5CFF); border: none; color: #fff; padding: 14px 36px; border-radius: 12px; font-weight: 800; font-size: 16px; cursor: pointer; box-shadow: 0 0 25px rgba(255, 51, 102, 0.5); transition: transform 0.2s; }
+  .btn-play:hover { transform: scale(1.05); }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="hud hud-top">
+  <div class="hud-pill">Survivors: <b id="survivors-val">4 / 4</b></div>
+  <div class="hud-pill">Arena: <span id="arena-status" style="color:#49F5A0">STABLE</span></div>
+  <div class="hud-pill">Score: <b id="score-val">0</b></div>
+</div>
+
+<div id="touch-joy-zone"><div id="touch-joy-thumb"></div></div>
+<div id="touch-dash-btn">DASH</div>
+
+<!-- Start Screen -->
+<div id="start-screen" class="screen">
+  <h1>KNOCKOUT ARENA</h1>
+  <p>Ram opponents off the floating cyber ring. Use Dash bursts to deliver brutal knockback. Last player standing wins!</p>
+  <button class="btn-play" id="start-btn">FIGHT FOR SURVIVAL</button>
+</div>
+
+<!-- Round Over Screen -->
+<div id="round-screen" class="screen hidden">
+  <h1 id="round-title">VICTORY ROYALE!</h1>
+  <p id="round-sub">You knocked out all rivals!</p>
+  <button class="btn-play" id="next-round-btn">PLAY AGAIN (SPACE)</button>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const survivorsVal = document.getElementById('survivors-val');
+  const arenaStatus = document.getElementById('arena-status');
+  const scoreVal = document.getElementById('score-val');
+  const startScreen = document.getElementById('start-screen');
+  const roundScreen = document.getElementById('round-screen');
+  const roundTitle = document.getElementById('round-title');
+  const roundSub = document.getElementById('round-sub');
+  const touchJoyZone = document.getElementById('touch-joy-zone');
+  const touchJoyThumb = document.getElementById('touch-joy-thumb');
+  const touchDashBtn = document.getElementById('touch-dash-btn');
+
+  let W = canvas.width = window.innerWidth;
+  let H = canvas.height = window.innerHeight;
+  window.addEventListener('resize', () => {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  });
+
+  const isTouch = 'ontouchstart' in window;
+  if (isTouch) {
+    touchJoyZone.style.display = 'block';
+    touchDashBtn.style.display = 'flex';
+  }
+
+  function playSound(type) {
+    if (window.parent && window.parent.NexoraSound) {
+      if (type === 'hit') window.parent.NexoraSound.playHit();
+      if (type === 'dash') window.parent.NexoraSound.playJump();
+      if (type === 'ko') window.parent.NexoraSound.playExplosion();
+      if (type === 'win') window.parent.NexoraSound.playWin();
+    }
+  }
+
+  let inGame = false;
+  let score = 0;
+  let arenaRadius = 380;
+  let minArenaRadius = 140;
+  let shrinkRate = 0.12;
+
+  // Controls
+  const keys = {};
+  window.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    if (e.code === 'Space') {
+      if (!inGame) startMatch();
+      else if (player) player.dash();
+    }
+  });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+  // Touch Joystick
+  let joyActive = false;
+  let joyDir = { x: 0, y: 0 };
+  touchJoyZone.addEventListener('touchstart', e => {
+    joyActive = true;
+  }, { passive: true });
+  touchJoyZone.addEventListener('touchmove', e => {
+    const rect = touchJoyZone.getBoundingClientRect();
+    const touch = e.touches[0];
+    const dx = touch.clientX - (rect.left + rect.width / 2);
+    const dy = touch.clientY - (rect.top + rect.height / 2);
+    const dist = Math.hypot(dx, dy);
+    const maxR = 45;
+    const angle = Math.atan2(dy, dx);
+    const r = Math.min(dist, maxR);
+    joyDir.x = Math.cos(angle) * (r / maxR);
+    joyDir.y = Math.sin(angle) * (r / maxR);
+    touchJoyThumb.style.transform = `translate(${joyDir.x * 35}px, ${joyDir.y * 35}px)`;
+  }, { passive: true });
+  touchJoyZone.addEventListener('touchend', () => {
+    joyActive = false;
+    joyDir = { x: 0, y: 0 };
+    touchJoyThumb.style.transform = 'translate(0px, 0px)';
+  });
+  touchDashBtn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (player) player.dash();
+  });
+
+  // Bumper Ball
+  class Bumper {
+    constructor(name, color, isPlayer = false, x, y) {
+      this.name = name;
+      this.color = color;
+      this.isPlayer = isPlayer;
+      this.x = x;
+      this.y = y;
+      this.vx = 0;
+      this.vy = 0;
+      this.radius = 24;
+      this.mass = 1;
+      this.alive = true;
+      this.dashCooldown = 0;
+      this.dashPulse = 0;
+    }
+
+    dash() {
+      if (this.dashCooldown <= 0 && this.alive) {
+        playSound('dash');
+        const mag = Math.hypot(this.vx, this.vy) || 1;
+        const dirX = this.vx / mag;
+        const dirY = this.vy / mag;
+        this.vx += dirX * 14;
+        this.vy += dirY * 14;
+        this.dashCooldown = 90; // ~1.5s
+        this.dashPulse = 1;
+      }
+    }
+
+    update() {
+      if (!this.alive) return;
+      if (this.dashCooldown > 0) this.dashCooldown--;
+      if (this.dashPulse > 0) this.dashPulse -= 0.05;
+
+      if (this.isPlayer) {
+        let ix = 0, iy = 0;
+        if (keys['KeyW'] || keys['ArrowUp']) iy -= 1;
+        if (keys['KeyS'] || keys['ArrowDown']) iy += 1;
+        if (keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
+        if (keys['KeyD'] || keys['ArrowRight']) ix += 1;
+
+        if (joyActive) {
+          ix = joyDir.x;
+          iy = joyDir.y;
+        }
+
+        const len = Math.hypot(ix, iy);
+        if (len > 0) {
+          this.vx += (ix / len) * 0.75;
+          this.vy += (iy / len) * 0.75;
+        }
+      } else {
+        // AI Logic: Seek closest opponent or center if close to edge
+        const distFromCenter = Math.hypot(this.x, this.y);
+        if (distFromCenter > arenaRadius * 0.75) {
+          // steer back to center
+          this.vx += (-this.x / distFromCenter) * 0.65;
+          this.vy += (-this.y / distFromCenter) * 0.65;
+        } else if (player && player.alive) {
+          const dx = player.x - this.x;
+          const dy = player.y - this.y;
+          const d = Math.hypot(dx, dy);
+          this.vx += (dx / d) * 0.55;
+          this.vy += (dy / d) * 0.55;
+          if (d < 120 && Math.random() < 0.04) this.dash();
+        }
+      }
+
+      // Friction
+      this.vx *= 0.95;
+      this.vy *= 0.95;
+
+      this.x += this.vx;
+      this.y += this.vy;
+
+      // Check arena edge fall
+      if (Math.hypot(this.x, this.y) > arenaRadius + this.radius) {
+        this.alive = false;
+        playSound('ko');
+        spawnParticles(this.x, this.y, this.color);
+        checkGameStatus();
+      }
+    }
+
+    draw() {
+      if (!this.alive) return;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+
+      // Dash aura
+      if (this.dashPulse > 0) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius + (1 - this.dashPulse) * 20, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Ball body
+      const grad = ctx.createRadialGradient(-6, -6, 2, 0, 0, this.radius);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.3, this.color);
+      grad.addColorStop(1, '#08090D');
+
+      ctx.fillStyle = grad;
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = this.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Outer ring
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius - 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Name & Cooldown Arc
+      ctx.fillStyle = '#F5F6FA';
+      ctx.font = 'bold 11px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(this.name, 0, -this.radius - 8);
+
+      if (this.isPlayer && this.dashCooldown > 0) {
+        ctx.strokeStyle = '#FF3366';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        const pct = (90 - this.dashCooldown) / 90;
+        ctx.arc(0, 0, this.radius + 6, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  // Particles
+  const particles = [];
+  function spawnParticles(x, y, color) {
+    for (let i = 0; i < 30; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 8 + 2;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        color,
+        life: 1,
+        decay: Math.random() * 0.03 + 0.02
+      });
+    }
+  }
+
+  let player = null;
+  let fighters = [];
+
+  function startMatch() {
+    inGame = true;
+    startScreen.classList.add('hidden');
+    roundScreen.classList.add('hidden');
+    arenaRadius = 380;
+    arenaStatus.textContent = 'STABLE';
+    arenaStatus.style.color = '#49F5A0';
+
+    const pName = (window.parent && window.parent.NexoraGuest && window.parent.NexoraGuest.profile.name) || 'CyberKnockout';
+    player = new Bumper(pName, '#00D9FF', true, 0, 160);
+    fighters = [
+      player,
+      new Bumper('BlazeBot', '#FF3366', false, -160, 0),
+      new Bumper('VortexAI', '#9B5CFF', false, 160, 0),
+      new Bumper('ApexTitan', '#FFB800', false, 0, -160)
+    ];
+  }
+
+  document.getElementById('start-btn').addEventListener('click', startMatch);
+  document.getElementById('next-round-btn').addEventListener('click', startMatch);
+
+  function checkGameStatus() {
+    const aliveCount = fighters.filter(f => f.alive).length;
+    survivorsVal.textContent = `${aliveCount} / ${fighters.length}`;
+
+    if (!player.alive) {
+      inGame = false;
+      roundTitle.textContent = 'ELIMINATED!';
+      roundTitle.style.background = 'linear-gradient(135deg, #FF3366, #9B5CFF)';
+      roundTitle.style.webkitBackgroundClip = 'text';
+      roundSub.textContent = `You fell off the platform! Score: ${score}`;
+      roundScreen.classList.remove('hidden');
+      if (window.parent && window.parent.NexoraGuest) {
+        window.parent.NexoraGuest.recordGameScore('knockout-arena', score);
+      }
+    } else if (aliveCount === 1 && player.alive) {
+      inGame = false;
+      score += 250;
+      scoreVal.textContent = score;
+      playSound('win');
+      roundTitle.textContent = 'VICTORY ROYALE!';
+      roundTitle.style.background = 'linear-gradient(135deg, #49F5A0, #00D9FF)';
+      roundTitle.style.webkitBackgroundClip = 'text';
+      roundSub.textContent = `You are the Champion of Knockout Arena! +250 PTS`;
+      roundScreen.classList.remove('hidden');
+      if (window.parent && window.parent.NexoraGuest) {
+        window.parent.NexoraGuest.recordGameScore('knockout-arena', score);
+      }
+    }
+  }
+
+  // Loop
+  function loop() {
+    ctx.fillStyle = '#08090D';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+
+    if (inGame && arenaRadius > minArenaRadius) {
+      arenaRadius -= shrinkRate;
+      if (arenaRadius < 260) {
+        arenaStatus.textContent = 'CRUMBLING!';
+        arenaStatus.style.color = '#FF3366';
+      }
+    }
+
+    // Platform Glow
+    ctx.fillStyle = '#11131B';
+    ctx.strokeStyle = arenaRadius < 260 ? '#FF3366' : '#9B5CFF';
+    ctx.lineWidth = 6;
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.beginPath();
+    ctx.arc(0, 0, arenaRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Platform ring markings
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, arenaRadius * 0.65, 0, Math.PI * 2);
+    ctx.arc(0, 0, arenaRadius * 0.35, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Collisions
+    for (let i = 0; i < fighters.length; i++) {
+      for (let j = i + 1; j < fighters.length; j++) {
+        const a = fighters[i];
+        const b = fighters[j];
+        if (a.alive && b.alive) {
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < a.radius + b.radius) {
+            playSound('hit');
+            if (a.isPlayer || b.isPlayer) {
+              score += 15;
+              scoreVal.textContent = score;
+            }
+            // Elastic collision bounce with momentum transfer
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const kx = a.vx - b.vx;
+            const ky = a.vy - b.vy;
+            const p = 2 * (nx * kx + ny * ky) / (a.mass + b.mass);
+
+            a.vx -= p * b.mass * nx * 1.35;
+            a.vy -= p * b.mass * ny * 1.35;
+            b.vx += p * a.mass * nx * 1.35;
+            b.vy += p * a.mass * ny * 1.35;
+
+            // Separate
+            const overlap = (a.radius + b.radius) - dist;
+            a.x -= nx * overlap * 0.5;
+            a.y -= ny * overlap * 0.5;
+            b.x += nx * overlap * 0.5;
+            b.y += ny * overlap * 0.5;
+
+            spawnParticles((a.x + b.x) / 2, (a.y + b.y) / 2, '#fff');
+          }
+        }
+      }
+    }
+
+    // Update & draw fighters
+    fighters.forEach(f => {
+      f.update();
+      f.draw();
+    });
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= p.decay;
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    ctx.restore();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

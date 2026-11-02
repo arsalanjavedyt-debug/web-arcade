@@ -1,0 +1,20 @@
+{
+  "title": "Knockout Arena",
+  "description": "A high-octane physics bumper battle! Slam into opponents, trigger explosive dashes, and push rivals off the floating cyber platform to be the last survivor standing.",
+  "category": "Multiplayer",
+  "difficulty": "Hard",
+  "duration": "2-3 min",
+  "icon": "💥",
+  "isMultiplayer": true,
+  "added": "2026-11-02",
+  "instructions": [
+    "Control your bumper sphere on the floating cyber platform.",
+    "Ram into opponents with maximum momentum to send them flying backwards.",
+    "Activate your Dash burst to deliver devastating knockback.",
+    "Stay away from the crumbling platform edges as the arena shrinks!"
+  ],
+  "controls": [
+    "WASD / Arrow Keys / Touch Joystick: Move & steer",
+    "Space / Tap Dash: Power dash burst"
+  ]
+}

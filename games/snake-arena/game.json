@@ -1,0 +1,20 @@
+{
+  "title": "Snake Arena",
+  "description": "Dominate the neon multiplayer arena! Slither, consume glowing energy orbs, boost to outmaneuver rivals, and collect fallen mass to grow into the ultimate serpent.",
+  "category": "Multiplayer",
+  "difficulty": "Medium",
+  "duration": "3-5 min",
+  "icon": "🐍",
+  "isMultiplayer": true,
+  "added": "2026-11-02",
+  "instructions": [
+    "Navigate your snake towards glowing energy orbs to grow longer and score points.",
+    "Trap other snakes so their heads crash into your body.",
+    "Collect the energy particles released by destroyed snakes to rapidly increase your size.",
+    "Compete on the live arena leaderboard for #1 Champion rank."
+  ],
+  "controls": [
+    "Mouse / Touch: Direct snake movement",
+    "Space / Left Click / Tap Boost: Speed boost (consumes energy)"
+  ]
+}

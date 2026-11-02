@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Neon Rush</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body, html { width: 100%; height: 100%; overflow: hidden; background: #08090D; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #fff; }
+  #canvas { display: block; width: 100%; height: 100%; }
+
+  .hud { position: absolute; pointer-events: none; }
+  .hud-top { top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .hud-pill { background: rgba(17, 19, 27, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(8px); padding: 8px 18px; border-radius: 9999px; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+  .hud-pill b { color: #00D9FF; font-family: monospace; font-size: 16px; }
+
+  /* Mobile Controls */
+  .mobile-ctrl { position: absolute; pointer-events: auto; display: none; }
+  .lane-ctrls { bottom: 24px; left: 24px; display: flex; gap: 12px; }
+  .jump-ctrls { bottom: 24px; right: 24px; display: flex; gap: 12px; }
+  .btn-touch { width: 64px; height: 64px; border-radius: 50%; background: rgba(23, 26, 37, 0.85); border: 2px solid rgba(0, 217, 255, 0.4); color: #fff; font-size: 20px; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .btn-touch:active { transform: scale(0.92); background: rgba(0, 217, 255, 0.25); }
+
+  /* Overlay Screens */
+  .screen { position: absolute; inset: 0; background: rgba(8, 9, 13, 0.85); backdrop-filter: blur(12px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; padding: 20px; }
+  .screen.hidden { display: none; }
+  .screen h1 { font-size: clamp(34px, 5vw, 52px); font-weight: 900; margin-bottom: 8px; background: linear-gradient(135deg, #00D9FF, #49F5A0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .screen p { color: #969BAD; max-width: 440px; margin-bottom: 24px; font-size: 15px; }
+  .btn-play { background: linear-gradient(135deg, #00D9FF, #49F5A0); border: none; color: #08090D; padding: 14px 36px; border-radius: 12px; font-weight: 800; font-size: 16px; cursor: pointer; box-shadow: 0 0 25px rgba(0, 217, 255, 0.5); transition: transform 0.2s; }
+  .btn-play:hover { transform: scale(1.05); }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="hud hud-top">
+  <div class="hud-pill">Distance: <b id="dist-val">0 M</b></div>
+  <div class="hud-pill">Coins: <b id="coins-val" style="color:#FFB800;">0</b></div>
+  <div class="hud-pill">Multiplier: <b id="mult-val" style="color:#49F5A0;">1.0X</b></div>
+</div>
+
+<div class="mobile-ctrl lane-ctrls" id="mobile-lane">
+  <div class="btn-touch" id="touch-left">◀</div>
+  <div class="btn-touch" id="touch-right">▶</div>
+</div>
+<div class="mobile-ctrl jump-ctrls" id="mobile-jump">
+  <div class="btn-touch" id="touch-slide" style="border-color:#FF3366;">▼</div>
+  <div class="btn-touch" id="touch-jump" style="border-color:#49F5A0;">▲</div>
+</div>
+
+<!-- Start Screen -->
+<div id="start-screen" class="screen">
+  <h1>NEON RUSH</h1>
+  <p>Dodge obstacles across 3 cyber lanes! Jump laser hurdles, slide under plasma gates, and collect coins at extreme speeds.</p>
+  <button class="btn-play" id="start-btn">ENGAGE THRUSTERS</button>
+</div>
+
+<!-- Game Over Screen -->
+<div id="gameover-screen" class="screen hidden">
+  <h1 style="background: linear-gradient(135deg, #FF3366, #9B5CFF); -webkit-background-clip: text;">WIPEOUT!</h1>
+  <p>Total Distance: <b id="final-dist" style="color:#00D9FF; font-size:22px;">0 M</b></p>
+  <button class="btn-play" id="restart-btn">RUN AGAIN (SPACE)</button>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const distVal = document.getElementById('dist-val');
+  const coinsVal = document.getElementById('coins-val');
+  const multVal = document.getElementById('mult-val');
+  const startScreen = document.getElementById('start-screen');
+  const gameoverScreen = document.getElementById('gameover-screen');
+  const finalDist = document.getElementById('final-dist');
+
+  let W = canvas.width = window.innerWidth;
+  let H = canvas.height = window.innerHeight;
+  window.addEventListener('resize', () => {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  });
+
+  if ('ontouchstart' in window) {
+    document.getElementById('mobile-lane').style.display = 'flex';
+    document.getElementById('mobile-jump').style.display = 'flex';
+  }
+
+  function playSound(type) {
+    if (window.parent && window.parent.NexoraSound) {
+      if (type === 'jump') window.parent.NexoraSound.playJump();
+      if (type === 'coin') window.parent.NexoraSound.playCollect();
+      if (type === 'hit') window.parent.NexoraSound.playHit();
+      if (type === 'crash') window.parent.NexoraSound.playExplosion();
+    }
+  }
+
+  let inGame = false;
+  let distance = 0;
+  let coins = 0;
+  let speed = 7.5;
+
+  // Player Runner
+  const LANES = [-1, 0, 1]; // Left, Center, Right
+  let currentLane = 1; // 0=left, 1=center, 2=right
+  let playerX = 0;
+  let playerY = 0; // vertical offset (jump)
+  let playerVy = 0;
+  let isJumping = false;
+  let isSliding = false;
+  let slideTimer = 0;
+
+  // Swipe gesture support
+  let touchStartX = 0;
+  let touchStartY = 0;
+  window.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  window.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (dx > 35) moveLane(1);
+      else if (dx < -35) moveLane(-1);
+    } else {
+      if (dy < -35) jump();
+      else if (dy > 35) slide();
+    }
+  });
+
+  function moveLane(dir) {
+    if (!inGame) return;
+    currentLane = Math.max(0, Math.min(2, currentLane + dir));
+    playSound('hit');
+  }
+
+  function jump() {
+    if (!inGame || isJumping) return;
+    isJumping = true;
+    playerVy = 13.5;
+    playSound('jump');
+  }
+
+  function slide() {
+    if (!inGame) return;
+    isSliding = true;
+    slideTimer = 35;
+    if (isJumping) playerVy = -10; // fast drop
+    playSound('hit');
+  }
+
+  // Keyboard
+  window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') moveLane(-1);
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') moveLane(1);
+    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+      if (!inGame) startRun();
+      else jump();
+    }
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') slide();
+  });
+
+  document.getElementById('touch-left').addEventListener('touchstart', e => { e.preventDefault(); moveLane(-1); });
+  document.getElementById('touch-right').addEventListener('touchstart', e => { e.preventDefault(); moveLane(1); });
+  document.getElementById('touch-jump').addEventListener('touchstart', e => { e.preventDefault(); jump(); });
+  document.getElementById('touch-slide').addEventListener('touchstart', e => { e.preventDefault(); slide(); });
+
+  // Obstacles & Coins
+  const items = [];
+  function spawnItem() {
+    const lane = Math.floor(Math.random() * 3);
+    const typeRoll = Math.random();
+    let type = 'HURDLE'; // jump over
+    if (typeRoll < 0.35) type = 'GATE'; // slide under
+    else if (typeRoll < 0.65) type = 'COIN';
+
+    items.push({
+      lane: lane,
+      z: 1600, // Distance along corridor
+      type: type,
+      collected: false
+    });
+  }
+
+  function startRun() {
+    inGame = true;
+    startScreen.classList.add('hidden');
+    gameoverScreen.classList.add('hidden');
+    distance = 0;
+    coins = 0;
+    speed = 7.5;
+    currentLane = 1;
+    playerY = 0;
+    playerVy = 0;
+    isJumping = false;
+    isSliding = false;
+    items.length = 0;
+    for (let i = 0; i < 6; i++) {
+      items.push({
+        lane: Math.floor(Math.random() * 3),
+        z: 600 + i * 280,
+        type: i % 2 === 0 ? 'COIN' : 'HURDLE',
+        collected: false
+      });
+    }
+  }
+
+  document.getElementById('start-btn').addEventListener('click', startRun);
+  document.getElementById('restart-btn').addEventListener('click', startRun);
+
+  function gameOver() {
+    inGame = false;
+    playSound('crash');
+    const finalScore = Math.floor(distance + coins * 10);
+    finalDist.textContent = `${Math.floor(distance)} M (${coins} Coins)`;
+    gameoverScreen.classList.remove('hidden');
+
+    if (window.parent && window.parent.NexoraGuest) {
+      window.parent.NexoraGuest.recordGameScore('neon-rush', finalScore);
+    }
+  }
+
+  // Loop
+  function loop() {
+    ctx.fillStyle = '#08090D';
+    ctx.fillRect(0, 0, W, H);
+
+    // Horizon line & vanishing point
+    const vpX = W / 2;
+    const vpY = H * 0.42;
+    const roadWidthBottom = W * 0.75;
+    const roadWidthTop = W * 0.08;
+
+    // Draw Cyber Track
+    ctx.fillStyle = '#11131B';
+    ctx.beginPath();
+    ctx.moveTo(vpX - roadWidthTop / 2, vpY);
+    ctx.lineTo(vpX + roadWidthTop / 2, vpY);
+    ctx.lineTo(vpX + roadWidthBottom / 2, H);
+    ctx.lineTo(vpX - roadWidthBottom / 2, H);
+    ctx.closePath();
+    ctx.fill();
+
+    // Road Neon Edges
+    ctx.strokeStyle = '#00D9FF';
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#00D9FF';
+    ctx.beginPath();
+    ctx.moveTo(vpX - roadWidthTop / 2, vpY);
+    ctx.lineTo(vpX - roadWidthBottom / 2, H);
+    ctx.moveTo(vpX + roadWidthTop / 2, vpY);
+    ctx.lineTo(vpX + roadWidthBottom / 2, H);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Lane Dividers
+    ctx.strokeStyle = 'rgba(155, 92, 255, 0.4)';
+    ctx.lineWidth = 2;
+    for (let l = 1; l <= 2; l++) {
+      const topX = vpX - roadWidthTop / 2 + (roadWidthTop / 3) * l;
+      const botX = vpX - roadWidthBottom / 2 + (roadWidthBottom / 3) * l;
+      ctx.beginPath();
+      ctx.moveTo(topX, vpY);
+      ctx.lineTo(botX, H);
+      ctx.stroke();
+    }
+
+    if (inGame) {
+      distance += speed * 0.08;
+      speed += 0.0015; // smooth difficulty progression
+      distVal.textContent = `${Math.floor(distance)} M`;
+      coinsVal.textContent = coins;
+      multVal.textContent = `${(speed / 7.5).toFixed(1)}X`;
+
+      // Jump Physics
+      if (isJumping) {
+        playerY += playerVy;
+        playerVy -= 0.65;
+        if (playerY <= 0) {
+          playerY = 0;
+          playerVy = 0;
+          isJumping = false;
+        }
+      }
+
+      // Slide Timer
+      if (isSliding) {
+        slideTimer--;
+        if (slideTimer <= 0) isSliding = false;
+      }
+
+      // Target player X based on currentLane
+      const targetX = (currentLane - 1) * (roadWidthBottom / 3.4);
+      playerX += (targetX - playerX) * 0.22;
+
+      // Spawn items
+      if (items.length < 9) spawnItem();
+    }
+
+    // Process & Draw Items (3D Projection onto Canvas)
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      if (inGame) item.z -= speed;
+
+      if (item.z <= 0) {
+        items.splice(i, 1);
+        continue;
+      }
+
+      // Perspective Scale
+      const scale = 380 / (item.z + 200);
+      const curRoadW = roadWidthTop + (roadWidthBottom - roadWidthTop) * (1 - item.z / 1600);
+      const laneStep = curRoadW / 3;
+      const x = vpX + (item.lane - 1) * laneStep;
+      const y = vpY + (H - vpY) * Math.pow(1 - item.z / 1600, 1.4);
+
+      if (item.type === 'COIN' && !item.collected) {
+        // Neon Coin
+        ctx.fillStyle = '#FFB800';
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = '#FFB800';
+        ctx.beginPath();
+        ctx.arc(x, y - 25 * scale, 18 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Collect check
+        if (inGame && item.z < 120 && item.z > 30 && item.lane === currentLane && playerY < 60) {
+          item.collected = true;
+          coins++;
+          playSound('coin');
+        }
+      } else if (item.type === 'HURDLE') {
+        // Low barrier to jump over
+        ctx.fillStyle = '#FF3366';
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#FF3366';
+        const bw = 80 * scale;
+        const bh = 36 * scale;
+        ctx.fillRect(x - bw / 2, y - bh, bw, bh);
+        ctx.shadowBlur = 0;
+
+        // Collision check: Must be jumping high to clear
+        if (inGame && item.z < 100 && item.z > 40 && item.lane === currentLane) {
+          if (playerY < 24) gameOver();
+        }
+      } else if (item.type === 'GATE') {
+        // High electric plasma gate: must slide under
+        ctx.fillStyle = '#9B5CFF';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#9B5CFF';
+        const gw = 90 * scale;
+        const gh = 30 * scale;
+        ctx.fillRect(x - gw / 2, y - 110 * scale, gw, gh);
+        ctx.shadowBlur = 0;
+
+        // Collision check: Must be sliding to clear
+        if (inGame && item.z < 100 && item.z > 40 && item.lane === currentLane) {
+          if (!isSliding) gameOver();
+        }
+      }
+    }
+
+    // Draw Player Avatar
+    const pBaseY = H - 80;
+    const px = vpX + playerX;
+    const py = pBaseY - playerY;
+
+    ctx.save();
+    ctx.translate(px, py);
+
+    if (isSliding) {
+      // Sliding posture (compact crouch)
+      ctx.fillStyle = '#49F5A0';
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = '#49F5A0';
+      ctx.fillRect(-22, 10, 44, 20);
+      ctx.shadowBlur = 0;
+    } else {
+      // Running / Jumping posture
+      ctx.fillStyle = '#00D9FF';
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#00D9FF';
+
+      // Torso
+      ctx.fillRect(-16, -42, 32, 42);
+      ctx.shadowBlur = 0;
+
+      // Visor
+      ctx.fillStyle = '#9B5CFF';
+      ctx.fillRect(-12, -36, 24, 10);
+
+      // Jetpack Thruster
+      ctx.fillStyle = '#FFB800';
+      ctx.beginPath();
+      ctx.moveTo(-8, 0);
+      ctx.lineTo(0, 16 + Math.random() * 8);
+      ctx.lineTo(8, 0);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

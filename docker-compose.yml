@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - ADMIN_SECRET=nexora_production_admin_2026
+      - DATABASE_URL=postgresql://nexora_user:nexora_secret_pass@db:5432/nexoraplay?schema=public
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: nexora_user
+      POSTGRES_PASSWORD: nexora_secret_pass
+      POSTGRES_DB: nexoraplay
+    ports:
+      - "5432:5432"
+    volumes:
+      - nexora_pgdata:/var/lib/postgresql/data
+
+volumes:
+  nexora_pgdata:

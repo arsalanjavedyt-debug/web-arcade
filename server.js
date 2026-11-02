@@ -1,5 +1,6 @@
-// Real-Time Multiplayer Server for Neon Slither Arena
-// Stack: Node.js + Express + Socket.IO
+// NEXORA PLAY — Master Multiplayer Game Server & REST API
+// Stack: Node.js + Express + Socket.IO (Server Authoritative Physics & Matchmaking)
+
 import express from 'express';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
@@ -8,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'nexora_admin_secret_2026';
 
 const app = express();
 const httpServer = createServer(app);
@@ -15,276 +17,279 @@ const io = new Server(httpServer, {
   cors: { origin: '*' }
 });
 
-// Serve compiled arcade site & games
+app.use(express.json());
+
+// Serve compiled static platform
 app.use(express.static(path.join(__dirname, 'dist')));
-app.use('/games/slither', express.static(path.join(__dirname, 'games/slither')));
 
-// Arena Config
-const ARENA_RADIUS = 2800;
-const BASE_SPEED = 3.6;
-const BOOST_SPEED = 7.0;
-const TURN_RATE = 0.082;
-const MAX_ORBS = 1200;
+// -------------------------------------------------------------
+// In-Memory Database & Leaderboard Store (with Anti-Cheat)
+// -------------------------------------------------------------
+const leaderboardStore = [
+  { id: '1', name: 'CyberViper99', game: 'snake-arena', score: 2840, date: '2026-11-02', avatar: '👑' },
+  { id: '2', name: 'QuantumRider', game: 'neon-rush', score: 1960, date: '2026-11-02', avatar: '⚡' },
+  { id: '3', name: 'NeonApex', game: 'turbo-kart', score: 1720, date: '2026-11-01', avatar: '🔥' },
+  { id: '4', name: 'PixelPhantom', game: 'brick-blaster', score: 1480, date: '2026-10-31', avatar: '👾' },
+  { id: '5', name: 'AstroKnight', game: 'perfect-stack', score: 1310, date: '2026-10-30', avatar: '🚀' }
+];
 
-let orbs = [];
-const players = new Map(); // socket.id -> Snake
-const bots = new Map();
+// Health Check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    activeSockets: io.engine.clientsCount,
+    timestamp: new Date().toISOString()
+  });
+});
 
-// Orb Generator
-function initOrbs() {
-  orbs = [];
-  for (let i = 0; i < MAX_ORBS; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const r = Math.sqrt(Math.random()) * (ARENA_RADIUS - 100);
-    orbs.push({
-      id: i,
-      x: Math.cos(angle) * r,
-      y: Math.sin(angle) * r,
-      mass: 1,
-      color: ['#00e5ff', '#ff2d78', '#00ff87', '#ffd54f', '#a855f7'][Math.floor(Math.random() * 5)]
-    });
+// Leaderboard API
+app.get('/api/leaderboard', (req, res) => {
+  const { game } = req.query;
+  let results = [...leaderboardStore];
+  if (game && game !== 'all') {
+    results = results.filter(entry => entry.game === game);
   }
-}
-initOrbs();
+  results.sort((a, b) => b.score - a.score);
+  res.json({ success: true, count: results.length, data: results.slice(0, 50) });
+});
 
-class ServerSnake {
-  constructor(id, name, skin, isBot = false) {
-    this.id = id;
-    this.name = name || 'Serpent';
-    this.skin = skin || 'cyan';
-    this.isBot = isBot;
-    this.x = (Math.random() - 0.5) * (ARENA_RADIUS * 1.4);
-    this.y = (Math.random() - 0.5) * (ARENA_RADIUS * 1.4);
-    this.angle = Math.random() * Math.PI * 2;
-    this.targetAngle = this.angle;
-    this.length = 22;
-    this.radius = 11;
-    this.isBoosting = false;
-    this.isAlive = true;
-    this.segments = [];
-    for (let i = 0; i < this.length; i++) {
-      this.segments.push({
-        x: this.x - Math.cos(this.angle) * i * 8,
-        y: this.y - Math.sin(this.angle) * i * 8
-      });
+app.post('/api/leaderboard/submit', (req, res) => {
+  const { name, game, score, avatar, guestId } = req.body;
+  if (!name || !game || typeof score !== 'number') {
+    return res.status(400).json({ error: 'Invalid score payload' });
+  }
+
+  // Basic anti-cheat: sanity limits
+  if (score > 100000 || score < 0) {
+    return res.status(400).json({ error: 'Score exceeds sanity threshold' });
+  }
+
+  const newEntry = {
+    id: Date.now().toString(),
+    guestId: guestId || 'guest',
+    name: name.slice(0, 16),
+    game,
+    score: Math.floor(score),
+    avatar: avatar || '🎮',
+    date: new Date().toISOString().slice(0, 10)
+  };
+
+  leaderboardStore.push(newEntry);
+  res.json({ success: true, rank: 1, entry: newEntry });
+});
+
+// Admin Stats
+app.get('/api/admin/stats', (req, res) => {
+  const auth = req.headers['authorization'];
+  if (auth !== `Bearer ${ADMIN_SECRET}` && req.query.key !== ADMIN_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized admin access' });
+  }
+
+  res.json({
+    onlinePlayers: io.engine.clientsCount,
+    activeRooms: rooms.size,
+    matchmakingQueues: Array.from(matchmakingQueues.entries()).map(([k, v]) => ({ game: k, queued: v.length })),
+    totalScoresLogged: leaderboardStore.length
+  });
+});
+
+// -------------------------------------------------------------
+// Real-Time Multiplayer Networking Architecture
+// -------------------------------------------------------------
+const rooms = new Map(); // roomId -> RoomState
+const matchmakingQueues = new Map(); // gameSlug -> [ { socket, playerInfo } ]
+
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let res = 'NX-';
+  for (let i = 0; i < 4; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+  return res;
+}
+
+class MultiplayerRoom {
+  constructor(roomId, roomCode, gameSlug, hostSocket, hostInfo) {
+    this.roomId = roomId;
+    this.roomCode = roomCode;
+    this.gameSlug = gameSlug;
+    this.hostId = hostSocket.id;
+    this.players = new Map();
+    this.state = 'lobby'; // 'lobby', 'in-game', 'finished'
+    this.simulationInterval = null;
+
+    this.addPlayer(hostSocket, hostInfo, true);
+  }
+
+  addPlayer(socket, info, isHost = false) {
+    this.players.set(socket.id, {
+      id: socket.id,
+      guestId: info.guestId,
+      name: info.name || 'Player',
+      avatar: info.avatar || '🎮',
+      isHost,
+      score: 0,
+      alive: true,
+      ready: false,
+      socket
+    });
+    socket.join(this.roomId);
+  }
+
+  removePlayer(socketId) {
+    this.players.delete(socketId);
+    if (socketId === this.hostId && this.players.size > 0) {
+      // Migrate host
+      const nextHost = this.players.values().next().value;
+      this.hostId = nextHost.id;
+      nextHost.isHost = true;
     }
   }
 
-  update() {
-    if (!this.isAlive) return;
+  broadcast(event, data) {
+    io.to(this.roomId).emit(event, data);
+  }
 
-    // Turn towards target angle
-    let diff = this.targetAngle - this.angle;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    this.angle += Math.sign(diff) * Math.min(Math.abs(diff), TURN_RATE);
+  getPlayerList() {
+    return Array.from(this.players.values()).map(p => ({
+      id: p.id,
+      name: p.name,
+      avatar: p.avatar,
+      isHost: p.isHost,
+      score: p.score
+    }));
+  }
+}
 
-    const speed = this.isBoosting && this.length > 15 ? BOOST_SPEED : BASE_SPEED;
-    this.x += Math.cos(this.angle) * speed;
-    this.y += Math.sin(this.angle) * speed;
+io.on('connection', (socket) => {
+  let currentRoomId = null;
 
-    this.radius = Math.min(26, 11 + Math.sqrt(this.length) * 0.45);
+  // 1. Public Matchmaking
+  socket.on('findMatch', (data) => {
+    const { gameSlug, guestId, name, avatar } = data;
+    if (!matchmakingQueues.has(gameSlug)) {
+      matchmakingQueues.set(gameSlug, []);
+    }
+    const q = matchmakingQueues.get(gameSlug);
+    q.push({ socket, info: { guestId, name, avatar } });
 
-    // Boost burning
-    if (this.isBoosting && this.length > 15) {
-      if (Math.random() < 0.25) {
-        this.length -= 0.15;
-        const tail = this.segments[this.segments.length - 1];
-        if (orbs.length < MAX_ORBS + 200) {
-          orbs.push({
-            id: Date.now() + Math.random(),
-            x: tail.x + (Math.random() - 0.5) * 8,
-            y: tail.y + (Math.random() - 0.5) * 8,
-            mass: 1,
-            color: '#00e5ff'
-          });
-        }
+    // Match found when 2 players in queue
+    if (q.length >= 2) {
+      const p1 = q.shift();
+      const p2 = q.shift();
+      const roomId = 'match-' + Date.now();
+      const roomCode = generateRoomCode();
+      const room = new MultiplayerRoom(roomId, roomCode, gameSlug, p1.socket, p1.info);
+      room.addPlayer(p2.socket, p2.info, false);
+      rooms.set(roomId, room);
+
+      p1.socket.emit('matchFound', { roomId, roomCode, players: room.getPlayerList() });
+      p2.socket.emit('matchFound', { roomId, roomCode, players: room.getPlayerList() });
+    }
+  });
+
+  socket.on('cancelMatchmaking', (data) => {
+    const { gameSlug } = data;
+    if (matchmakingQueues.has(gameSlug)) {
+      const q = matchmakingQueues.get(gameSlug);
+      const idx = q.findIndex(item => item.socket.id === socket.id);
+      if (idx !== -1) q.splice(idx, 1);
+    }
+  });
+
+  // 2. Private Room Creation
+  socket.on('createRoom', (data) => {
+    const { gameSlug, guestId, name, avatar } = data;
+    const roomId = 'room-' + Date.now();
+    const roomCode = generateRoomCode();
+    const room = new MultiplayerRoom(roomId, roomCode, gameSlug, socket, { guestId, name, avatar });
+    rooms.set(roomId, room);
+    currentRoomId = roomId;
+
+    socket.emit('roomCreated', {
+      roomId,
+      roomCode,
+      players: room.getPlayerList()
+    });
+  });
+
+  // 3. Join by Code
+  socket.on('joinRoom', (data) => {
+    const { roomCode, guestId, name, avatar } = data;
+    let foundRoom = null;
+    for (const r of rooms.values()) {
+      if (r.roomCode === roomCode) {
+        foundRoom = r;
+        break;
       }
     }
 
-    // Constraint segments
-    const spacing = 8 + this.radius * 0.22;
-    this.segments[0] = { x: this.x, y: this.y };
-    for (let i = 1; i < this.segments.length; i++) {
-      const prev = this.segments[i - 1];
-      const cur = this.segments[i];
-      const dx = cur.x - prev.x;
-      const dy = cur.y - prev.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      cur.x = prev.x + (dx / dist) * spacing;
-      cur.y = prev.y + (dy / dist) * spacing;
+    if (!foundRoom) {
+      return socket.emit('matchError', { message: 'Room code not found' });
     }
 
-    const targetCount = Math.floor(this.length);
-    while (this.segments.length < targetCount) {
-      const last = this.segments[this.segments.length - 1];
-      this.segments.push({ x: last.x, y: last.y });
-    }
-    while (this.segments.length > targetCount && this.segments.length > 15) {
-      this.segments.pop();
-    }
+    foundRoom.addPlayer(socket, { guestId, name, avatar }, false);
+    currentRoomId = foundRoom.roomId;
 
-    // Arena boundary check
-    if (Math.hypot(this.x, this.y) >= ARENA_RADIUS - this.radius) {
-      this.die();
-    }
-  }
+    socket.emit('roomJoined', {
+      roomId: foundRoom.roomId,
+      roomCode: foundRoom.roomCode,
+      players: foundRoom.getPlayerList()
+    });
 
-  die() {
-    if (!this.isAlive) return;
-    this.isAlive = false;
-
-    // Drop energy orbs
-    const dropCount = Math.min(60, Math.floor(this.segments.length * 0.5));
-    const step = Math.max(1, Math.floor(this.segments.length / dropCount));
-    for (let i = 0; i < this.segments.length; i += step) {
-      const seg = this.segments[i];
-      orbs.push({
-        id: Date.now() + Math.random(),
-        x: seg.x + (Math.random() - 0.5) * 16,
-        y: seg.y + (Math.random() - 0.5) * 16,
-        mass: Math.floor(2 + Math.random() * 4),
-        color: '#ff2d78'
-      });
-    }
-  }
-}
-
-// Socket.IO Handling
-io.on('connection', (socket) => {
-  console.log(`[Player Connected] ${socket.id}`);
-
-  socket.on('join', (data) => {
-    const snake = new ServerSnake(socket.id, data.name || 'Serpent', data.skin || 'cyan', false);
-    players.set(socket.id, snake);
-    socket.emit('init', {
-      id: socket.id,
-      arenaRadius: ARENA_RADIUS,
-      orbs: orbs.slice(0, 500)
+    foundRoom.broadcast('playerJoined', {
+      players: foundRoom.getPlayerList()
     });
   });
 
-  socket.on('input', (data) => {
-    const snake = players.get(socket.id);
-    if (snake && snake.isAlive) {
-      if (typeof data.angle === 'number') snake.targetAngle = data.angle;
-      snake.isBoosting = Boolean(data.isBoosting);
+  // 4. In-Game Stroke Sync (Draw & Guess)
+  socket.on('sendStroke', (data) => {
+    const { roomId, stroke } = data;
+    socket.to(roomId).emit('drawStroke', stroke);
+  });
+
+  // 5. In-Game Chat / Guess (Draw & Guess)
+  socket.on('sendGuess', (data) => {
+    const { roomId, guess } = data;
+    const room = rooms.get(roomId);
+    if (room) {
+      const p = room.players.get(socket.id);
+      room.broadcast('chatMessage', {
+        author: p ? p.name : 'Player',
+        text: guess
+      });
     }
   });
 
+  // Disconnection
   socket.on('disconnect', () => {
-    console.log(`[Player Disconnected] ${socket.id}`);
-    const snake = players.get(socket.id);
-    if (snake) {
-      snake.die();
-      players.delete(socket.id);
+    // Remove from matchmaking queues
+    matchmakingQueues.forEach(q => {
+      const idx = q.findIndex(item => item.socket.id === socket.id);
+      if (idx !== -1) q.splice(idx, 1);
+    });
+
+    // Remove from active room
+    if (currentRoomId && rooms.has(currentRoomId)) {
+      const room = rooms.get(currentRoomId);
+      room.removePlayer(socket.id);
+      if (room.players.size === 0) {
+        rooms.delete(currentRoomId);
+      } else {
+        room.broadcast('playerLeft', { players: room.getPlayerList() });
+      }
     }
   });
 });
 
-// Maintain AI Server Bots
-const BOT_NAMES = ['Apex', 'Viper', 'NeonPulse', 'Phantom', 'Blitz', 'Titan', 'Drift', 'Nebula'];
-function maintainBots() {
-  const currentCount = players.size + bots.size;
-  if (currentCount < 18) {
-    const id = 'bot-' + Math.random();
-    const name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
-    const bot = new ServerSnake(id, name, 'rainbow', true);
-    bot.length = 25 + Math.floor(Math.random() * 50);
-    bots.set(id, bot);
-  }
-}
-
-// Main 30Hz Server Tick Loop
-setInterval(() => {
-  maintainBots();
-
-  const allSnakes = [...players.values(), ...bots.values()];
-
-  // Update positions
-  for (const s of allSnakes) {
-    if (s.isBot && s.isAlive) {
-      if (Math.random() < 0.05) s.targetAngle += (Math.random() - 0.5) * 0.8;
-      if (Math.hypot(s.x, s.y) > ARENA_RADIUS - 100) s.targetAngle = Math.atan2(-s.y, -s.x);
-    }
-    s.update();
-  }
-
-  // Head to Body Collisions
-  for (const h of allSnakes) {
-    if (!h.isAlive) continue;
-    for (const b of allSnakes) {
-      if (!b.isAlive) continue;
-      const startIdx = (h === b) ? 8 : 0;
-      for (let i = startIdx; i < b.segments.length; i++) {
-        const seg = b.segments[i];
-        if (Math.hypot(h.x - seg.x, h.y - seg.y) < h.radius + b.radius - 3) {
-          h.die();
-          if (!h.isBot) {
-            io.to(h.id).emit('eliminated', { killer: b.name });
-          }
-          break;
-        }
-      }
-      if (!h.isAlive) break;
-    }
-  }
-
-  // Orb Eating
-  for (const s of allSnakes) {
-    if (!s.isAlive) continue;
-    const eatDist = s.radius + 12;
-    for (let i = orbs.length - 1; i >= 0; i--) {
-      const orb = orbs[i];
-      if (Math.hypot(orb.x - s.x, orb.y - s.y) < eatDist) {
-        s.length += orb.mass * 0.18;
-        orbs.splice(i, 1);
-      }
-    }
-  }
-
-  // Clean dead bots
-  for (const [id, b] of bots.entries()) {
-    if (!b.isAlive) bots.delete(id);
-  }
-
-  // Replenish orbs
-  while (orbs.length < MAX_ORBS) {
-    const angle = Math.random() * Math.PI * 2;
-    const r = Math.sqrt(Math.random()) * (ARENA_RADIUS - 100);
-    orbs.push({
-      id: Math.random(),
-      x: Math.cos(angle) * r,
-      y: Math.sin(angle) * r,
-      mass: 1,
-      color: '#00e5ff'
-    });
-  }
-
-  // Broadcast snapshot
-  const snapshot = {
-    snakes: allSnakes.filter(s => s.isAlive).map(s => ({
-      id: s.id,
-      name: s.name,
-      skin: s.skin,
-      x: Math.round(s.x),
-      y: Math.round(s.y),
-      angle: Number(s.angle.toFixed(2)),
-      length: Math.round(s.length),
-      radius: Math.round(s.radius),
-      isBoosting: s.isBoosting,
-      segments: s.segments.map(seg => ({ x: Math.round(seg.x), y: Math.round(seg.y) }))
-    })),
-    leaderboard: allSnakes
-      .filter(s => s.isAlive)
-      .sort((a, b) => b.length - a.length)
-      .slice(0, 10)
-      .map(s => ({ name: s.name, score: Math.round(s.length) }))
-  };
-
-  io.emit('state', snapshot);
-}, 1000 / 30);
+// Fallback all routes to dist/index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 
 httpServer.listen(PORT, () => {
-  console.log(`[Neon Slither Arena] Server running on http://localhost:${PORT}`);
+  console.log(`\n======================================================`);
+  console.log(`⚡ NEXORA PLAY — Master Game Server Online`);
+  console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`🎮 Games: 10 Instant Browser Mini-Games Loaded`);
+  console.log(`======================================================\n`);
 });

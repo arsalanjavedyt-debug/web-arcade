@@ -1,0 +1,21 @@
+{
+  "title": "Neon Rush",
+  "description": "Sprint through a futuristic cyberpunk metropolis at lightning velocity! Switch lanes, jump laser barriers, slide under plasma gates, and collect neon coins as speed ramps up indefinitely.",
+  "category": "Arcade",
+  "difficulty": "Hard",
+  "duration": "2-4 min",
+  "icon": "⚡",
+  "isMultiplayer": false,
+  "added": "2026-11-02",
+  "instructions": [
+    "Switch between 3 runner lanes to avoid oncoming obstacles.",
+    "Jump over ground barriers and spiked barriers.",
+    "Slide beneath overhead electric energy gates.",
+    "Collect neon energy coins to boost your multiplier and score."
+  ],
+  "controls": [
+    "Arrow Left / Right / Swipe Left-Right: Switch lanes",
+    "Arrow Up / Space / Swipe Up: Jump",
+    "Arrow Down / Swipe Down: Slide"
+  ]
+}

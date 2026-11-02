@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Draw & Guess</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body, html { width: 100%; height: 100%; overflow: hidden; background: #08090D; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #fff; }
+  
+  .game-container { display: grid; grid-template-columns: 220px 1fr 280px; height: 100vh; }
+  
+  /* Left Panel: Players & Scores */
+  .left-panel { background: #11131B; border-right: 1px solid rgba(255, 255, 255, 0.08); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .panel-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #9B5CFF; }
+  .player-list { display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; }
+  .player-card { background: #171A25; border: 1px solid rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .player-card.drawing { border-color: #00D9FF; box-shadow: 0 0 10px rgba(0, 217, 255, 0.3); }
+  .player-card b { color: #00D9FF; font-family: monospace; }
+
+  /* Center: Drawing Board */
+  .center-panel { display: flex; flex-direction: column; background: #08090D; }
+  .top-bar { height: 56px; background: #11131B; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+  .secret-word-display { font-size: 20px; font-weight: 800; letter-spacing: 4px; color: #49F5A0; }
+  .timer-badge { font-family: monospace; font-size: 20px; font-weight: 800; color: #FFB800; background: #171A25; padding: 4px 14px; border-radius: 20px; }
+
+  .canvas-wrapper { flex: 1; position: relative; background: #171A25; overflow: hidden; }
+  #canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+
+  .toolbar { height: 60px; background: #11131B; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; gap: 12px; }
+  .palette { display: flex; gap: 8px; }
+  .color-dot { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .color-dot.active { border-color: #fff; transform: scale(1.15); }
+  .tools-group { display: flex; gap: 8px; }
+  .tool-btn { background: #171A25; border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .tool-btn:hover { background: #1E2232; }
+
+  /* Right: Chat & Guesses */
+  .right-panel { background: #11131B; border-left: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; }
+  .chat-log { flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+  .chat-msg { padding: 6px 10px; border-radius: 6px; background: #171A25; }
+  .chat-msg.correct { background: rgba(73, 245, 160, 0.2); border: 1px solid #49F5A0; color: #49F5A0; font-weight: 700; }
+  .chat-input-box { padding: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; gap: 8px; }
+  .chat-input-box input { flex: 1; background: #171A25; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; padding: 10px 14px; font-size: 14px; outline: none; }
+  .chat-input-box button { background: #00D9FF; border: none; border-radius: 8px; color: #08090D; font-weight: 800; padding: 0 16px; cursor: pointer; }
+
+  /* Word Select Modal */
+  .modal-overlay { position: absolute; inset: 0; background: rgba(8, 9, 13, 0.9); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 50; }
+  .modal-overlay.hidden { display: none; }
+  .word-box { background: #171A25; border: 1px solid #9B5CFF; border-radius: 16px; padding: 32px; text-align: center; max-width: 440px; }
+  .word-options { display: flex; gap: 12px; justify-content: center; margin-top: 20px; }
+  .word-btn { background: #11131B; border: 1px solid rgba(255, 255, 255, 0.15); color: #00D9FF; padding: 12px 20px; border-radius: 10px; font-size: 16px; font-weight: 800; cursor: pointer; }
+  .word-btn:hover { background: #00D9FF; color: #08090D; }
+
+  @media (max-width: 768px) {
+    .game-container { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+    .left-panel { display: none; }
+    .right-panel { height: 180px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="game-container">
+  <!-- Players Column -->
+  <div class="left-panel">
+    <div class="panel-title">Players & Scores</div>
+    <div class="player-list" id="player-list"></div>
+    <div style="font-size:11px; color:#969BAD;">Round <span id="round-num">1</span> of 3</div>
+  </div>
+
+  <!-- Center Canvas Column -->
+  <div class="center-panel">
+    <div class="top-bar">
+      <div class="timer-badge" id="timer-box">60s</div>
+      <div class="secret-word-display" id="word-display">_ _ _ _ _</div>
+      <div style="font-size:13px; color:#969BAD;" id="drawer-info">Drawer: You</div>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="canvas"></canvas>
+    </div>
+
+    <div class="toolbar" id="toolbar">
+      <div class="palette">
+        <div class="color-dot active" style="background:#00D9FF;" data-color="#00D9FF"></div>
+        <div class="color-dot" style="background:#9B5CFF;" data-color="#9B5CFF"></div>
+        <div class="color-dot" style="background:#49F5A0;" data-color="#49F5A0"></div>
+        <div class="color-dot" style="background:#FF3366;" data-color="#FF3366"></div>
+        <div class="color-dot" style="background:#FFB800;" data-color="#FFB800"></div>
+        <div class="color-dot" style="background:#FFFFFF;" data-color="#FFFFFF"></div>
+        <div class="color-dot" style="background:#171A25;" data-color="#171A25" title="Eraser"></div>
+      </div>
+
+      <div class="tools-group">
+        <button class="tool-btn" id="btn-size-sm">Small</button>
+        <button class="tool-btn" id="btn-size-lg">Thick</button>
+        <button class="tool-btn" id="btn-clear" style="color:#FF3366;">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Chat Column -->
+  <div class="right-panel">
+    <div class="panel-title" style="padding: 14px 14px 0;">Live Guesses</div>
+    <div class="chat-log" id="chat-log"></div>
+    <div class="chat-input-box">
+      <input type="text" id="guess-input" placeholder="Type your guess here..." maxlength="24">
+      <button id="send-guess-btn">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- Word Picker Modal -->
+<div class="modal-overlay hidden" id="word-modal">
+  <div class="word-box">
+    <h2 style="font-size:20px; font-weight:800; margin-bottom:8px;">Choose a Secret Word</h2>
+    <p style="color:#969BAD; font-size:13px;">Pick one word to draw for the other players:</p>
+    <div class="word-options" id="word-options"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const chatLog = document.getElementById('chat-log');
+  const guessInput = document.getElementById('guess-input');
+  const sendGuessBtn = document.getElementById('send-guess-btn');
+  const timerBox = document.getElementById('timer-box');
+  const wordDisplay = document.getElementById('word-display');
+  const drawerInfo = document.getElementById('drawer-info');
+  const playerList = document.getElementById('player-list');
+  const wordModal = document.getElementById('word-modal');
+  const wordOptions = document.getElementById('word-options');
+
+  let W = canvas.width = canvas.parentElement.clientWidth;
+  let H = canvas.height = canvas.parentElement.clientHeight;
+  window.addEventListener('resize', () => {
+    W = canvas.width = canvas.parentElement.clientWidth;
+    H = canvas.height = canvas.parentElement.clientHeight;
+    ctx.fillStyle = '#171A25';
+    ctx.fillRect(0, 0, W, H);
+  });
+
+  // Sound triggers
+  function playSound(type) {
+    if (window.parent && window.parent.NexoraSound) {
+      if (type === 'click') window.parent.NexoraSound.playClick();
+      if (type === 'correct') window.parent.NexoraSound.playCollect();
+      if (type === 'win') window.parent.NexoraSound.playWin();
+    }
+  }
+
+  // Clear background
+  ctx.fillStyle = '#171A25';
+  ctx.fillRect(0, 0, W, H);
+
+  // Drawing state
+  let isDrawing = false;
+  let brushColor = '#00D9FF';
+  let brushSize = 4;
+  let isMyTurnToDraw = true;
+  let secretWord = 'ROCKET';
+  let timeLeft = 60;
+  let timerInterval = null;
+
+  // Words bank
+  const WORD_BANK = ['ROCKET', 'PIZZA', 'DRAGON', 'GUITAR', 'PENGUIN', 'CASTLE', 'ROBOT', 'VOLCANO', 'DIAMOND', 'PIRATE', 'GALAXY', 'BURGER'];
+
+  // Players
+  const myName = (window.parent && window.parent.NexoraGuest && window.parent.NexoraGuest.profile.name) || 'CyberArtist';
+  const players = [
+    { name: myName, score: 0, isDrawer: true },
+    { name: 'NeonGuesser', score: 0, isDrawer: false },
+    { name: 'QuantumMind', score: 0, isDrawer: false },
+    { name: 'PixelFox', score: 0, isDrawer: false }
+  ];
+
+  function renderPlayers() {
+    playerList.innerHTML = players.map(p => `
+      <div class="player-card ${p.isDrawer ? 'drawing' : ''}">
+        <span>${p.isDrawer ? '🎨 ' : ''}${p.name}</span>
+        <b>${p.score} PTS</b>
+      </div>
+    `).join('');
+  }
+  renderPlayers();
+
+  // Brush color selector
+  document.querySelectorAll('.color-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+      dot.classList.add('active');
+      brushColor = dot.dataset.color;
+      playSound('click');
+    });
+  });
+
+  document.getElementById('btn-size-sm').addEventListener('click', () => { brushSize = 3; });
+  document.getElementById('btn-size-lg').addEventListener('click', () => { brushSize = 8; });
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    ctx.fillStyle = '#171A25';
+    ctx.fillRect(0, 0, W, H);
+  });
+
+  // Mouse & Touch events
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    if (e.touches && e.touches.length > 0) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function startDraw(e) {
+    if (!isMyTurnToDraw) return;
+    isDrawing = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  }
+
+  function draw(e) {
+    if (!isDrawing || !isMyTurnToDraw) return;
+    const pos = getPos(e);
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = brushColor;
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  }
+
+  function endDraw() {
+    isDrawing = false;
+  }
+
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  window.addEventListener('mouseup', endDraw);
+
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); startDraw(e); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); draw(e); }, { passive: false });
+  canvas.addEventListener('touchend', endDraw);
+
+  // Guess submission
+  function submitGuess() {
+    const txt = guessInput.value.trim();
+    if (!txt) return;
+    guessInput.value = '';
+
+    const isCorrect = txt.toUpperCase() === secretWord.toUpperCase();
+    addChatMessage(myName, txt, isCorrect);
+
+    if (isCorrect) {
+      playSound('correct');
+      players[0].score += Math.max(50, timeLeft * 4);
+      renderPlayers();
+      if (window.parent && window.parent.NexoraGuest) {
+        window.parent.NexoraGuest.recordGameScore('draw-guess', players[0].score);
+      }
+      setTimeout(nextTurn, 2000);
+    }
+  }
+
+  sendGuessBtn.addEventListener('click', submitGuess);
+  guessInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitGuess(); });
+
+  function addChatMessage(author, text, correct = false) {
+    const el = document.createElement('div');
+    el.className = `chat-msg ${correct ? 'correct' : ''}`;
+    el.innerHTML = `<b>${author}:</b> ${text} ${correct ? '🎉 (CORRECT!)' : ''}`;
+    chatLog.appendChild(el);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  // Turn rotation
+  function showWordModal() {
+    wordModal.classList.remove('hidden');
+    const picks = [WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)], WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)], WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)]];
+    wordOptions.innerHTML = picks.map(w => `<button class="word-btn">${w}</button>`).join('');
+
+    wordOptions.querySelectorAll('.word-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        secretWord = btn.textContent;
+        wordModal.classList.add('hidden');
+        startTurn();
+      });
+    });
+  }
+
+  function startTurn() {
+    ctx.fillStyle = '#171A25';
+    ctx.fillRect(0, 0, W, H);
+    timeLeft = 60;
+    timerBox.textContent = `${timeLeft}s`;
+
+    if (isMyTurnToDraw) {
+      wordDisplay.textContent = secretWord;
+      drawerInfo.textContent = 'Drawer: You';
+      addChatMessage('SYSTEM', `Your turn to draw: ${secretWord}`);
+    } else {
+      wordDisplay.textContent = secretWord.split('').map(() => '_').join(' ');
+      drawerInfo.textContent = 'Drawer: NeonGuesser';
+      addChatMessage('SYSTEM', 'NeonGuesser is now drawing. Guess the word!');
+    }
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      timerBox.textContent = `${timeLeft}s`;
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        addChatMessage('SYSTEM', `Time is up! The secret word was: ${secretWord}`);
+        setTimeout(nextTurn, 3000);
+      }
+
+      // Simulate AI bot guess
+      if (isMyTurnToDraw && timeLeft === 42 && Math.random() < 0.6) {
+        addChatMessage('QuantumMind', secretWord, true);
+        playSound('correct');
+        players[2].score += 80;
+        renderPlayers();
+      }
+    }, 1000);
+  }
+
+  function nextTurn() {
+    isMyTurnToDraw = !isMyTurnToDraw;
+    players.forEach(p => p.isDrawer = false);
+    if (isMyTurnToDraw) {
+      players[0].isDrawer = true;
+      showWordModal();
+    } else {
+      players[1].isDrawer = true;
+      secretWord = WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)];
+      startTurn();
+    }
+    renderPlayers();
+  }
+
+  showWordModal();
+})();
+</script>
+</body>
+</html>

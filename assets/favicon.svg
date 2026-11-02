@@ -1,15 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#07080f"/>
-  <rect width="64" height="64" rx="14" fill="url(#g)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0d0f1c"/>
-      <stop offset="100%" stop-color="#1c1a38"/>
+    <linearGradient id="favGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00D9FF"/>
+      <stop offset="50%" stop-color="#9B5CFF"/>
+      <stop offset="100%" stop-color="#49F5A0"/>
     </linearGradient>
   </defs>
-  <!-- Play triangle -->
-  <polygon points="22,16 22,48 50,32" fill="#00e5ff" opacity="0.95"/>
-  <!-- Neon glow ring -->
-  <circle cx="32" cy="32" r="28" fill="none" stroke="#00e5ff" stroke-width="2.5" opacity="0.3"/>
+  <rect width="64" height="64" rx="14" fill="#08090D"/>
+  <polygon points="32,6 56,19 56,45 32,58 8,45 8,19" fill="#11131B" stroke="url(#favGrad)" stroke-width="3"/>
+  <path d="M22 44 L22 20 L29 20 L42 38 L42 20 L48 20 L48 44 L41 44 L28 26 L28 44 Z" fill="url(#favGrad)" />
+  <polygon points="32,32 36,34 32,36 28,34" fill="#49F5A0" />
 </svg>
-

@@ -1,0 +1,19 @@
+{
+  "title": "Perfect Stack",
+  "description": "Test your reflexes and precision! Tap to drop traveling neon slabs, slice off misalignments, and trigger harmonic combo streaks as you construct the tallest tower in the cosmos.",
+  "category": "Arcade",
+  "difficulty": "Easy",
+  "duration": "2 min",
+  "icon": "🥞",
+  "isMultiplayer": false,
+  "added": "2026-11-02",
+  "instructions": [
+    "A neon block slides continuously back and forth across the screen.",
+    "Click, press Space, or tap to drop the block onto the existing stack.",
+    "Any portion hanging off the edge will be sliced off!",
+    "Achieve consecutive perfect alignments to restore block width and activate mega combos."
+  ],
+  "controls": [
+    "Mouse Click / Spacebar / Touch Tap: Drop block"
+  ]
+}

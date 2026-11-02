@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Number Fusion</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body, html { width: 100%; height: 100%; overflow: hidden; background: #08090D; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+  .fusion-wrap { width: 100%; max-width: 440px; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+
+  .header-bar { display: flex; align-items: center; justify-content: space-between; }
+  .title-group h1 { font-size: 26px; font-weight: 900; background: linear-gradient(135deg, #00D9FF, #9B5CFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .title-group p { font-size: 12px; color: #969BAD; }
+
+  .stats-group { display: flex; gap: 8px; }
+  .stat-box { background: #171A25; border: 1px solid rgba(255, 255, 255, 0.08); padding: 6px 14px; border-radius: 8px; text-align: center; }
+  .stat-box span { font-size: 10px; text-transform: uppercase; color: #969BAD; display: block; }
+  .stat-box b { font-family: monospace; font-size: 15px; color: #00D9FF; }
+
+  .action-bar { display: flex; justify-content: space-between; gap: 10px; }
+  .btn-ctrl { background: #171A25; border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
+  .btn-ctrl:hover { background: #1E2232; border-color: #00D9FF; }
+  .btn-undo { color: #FFB800; }
+
+  /* 4x4 Grid */
+  .grid-board { position: relative; width: 100%; aspect-ratio: 1; background: #11131B; border: 2px solid rgba(155, 92, 255, 0.3); border-radius: 16px; padding: 12px; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 10px; touch-action: none; box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
+
+  .tile { border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; font-family: monospace; transition: transform 0.1s ease; }
+  
+  /* Tile Colors */
+  .tile-0 { background: rgba(255, 255, 255, 0.03); }
+  .tile-2 { background: #171A25; color: #00D9FF; border: 1px solid rgba(0, 217, 255, 0.3); }
+  .tile-4 { background: #1A182E; color: #9B5CFF; border: 1px solid rgba(155, 92, 255, 0.4); }
+  .tile-8 { background: #112822; color: #49F5A0; border: 1px solid rgba(73, 245, 160, 0.4); }
+  .tile-16 { background: #2E2512; color: #FFB800; border: 1px solid rgba(255, 184, 0, 0.4); }
+  .tile-32 { background: #2E151E; color: #FF3366; border: 1px solid rgba(255, 51, 102, 0.5); }
+  .tile-64 { background: #00D9FF; color: #08090D; box-shadow: 0 0 15px rgba(0, 217, 255, 0.5); }
+  .tile-128 { background: #9B5CFF; color: #fff; box-shadow: 0 0 15px rgba(155, 92, 255, 0.5); font-size: 20px; }
+  .tile-256 { background: #49F5A0; color: #08090D; box-shadow: 0 0 18px rgba(73, 245, 160, 0.5); font-size: 20px; }
+  .tile-528 { background: #FF3366; color: #fff; font-size: 20px; }
+  .tile-1024 { background: #FFB800; color: #08090D; font-size: 18px; }
+  .tile-2048 { background: linear-gradient(135deg, #00D9FF, #9B5CFF); color: #fff; box-shadow: 0 0 25px rgba(155, 92, 255, 0.8); font-size: 18px; }
+
+  /* Overlay */
+  .game-overlay { position: absolute; inset: 0; background: rgba(8, 9, 13, 0.88); backdrop-filter: blur(8px); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+  .game-overlay.open { opacity: 1; pointer-events: auto; }
+  .game-overlay h2 { font-size: 28px; font-weight: 900; color: #FF3366; }
+</style>
+</head>
+<body>
+
+<div class="fusion-wrap">
+  <div class="header-bar">
+    <div class="title-group">
+      <h1>NUMBER FUSION</h1>
+      <p>Fuse identical tiles to reach 2048</p>
+    </div>
+    <div class="stats-group">
+      <div class="stat-box"><span>Score</span><b id="score-val">0</b></div>
+      <div class="stat-box"><span>Best</span><b id="best-val">0</b></div>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <button class="btn-ctrl btn-undo" id="btn-undo">↺ Undo (<span id="undo-count">3</span>)</button>
+    <button class="btn-ctrl" id="btn-restart">↻ New Game</button>
+  </div>
+
+  <div class="grid-board" id="board">
+    <div class="game-overlay" id="overlay">
+      <h2 id="overlay-msg">NO MORE MOVES</h2>
+      <button class="btn-ctrl" id="btn-retry" style="background:#00D9FF; color:#08090D; font-weight:800; padding:10px 24px;">TRY AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const boardEl = document.getElementById('board');
+  const scoreVal = document.getElementById('score-val');
+  const bestVal = document.getElementById('best-val');
+  const undoCountEl = document.getElementById('undo-count');
+  const overlay = document.getElementById('overlay');
+  const btnUndo = document.getElementById('btn-undo');
+  const btnRestart = document.getElementById('btn-restart');
+  const btnRetry = document.getElementById('btn-retry');
+
+  function playSound(type) {
+    if (window.parent && window.parent.NexoraSound) {
+      if (type === 'merge') window.parent.NexoraSound.playCollect();
+      if (type === 'slide') window.parent.NexoraSound.playHit();
+      if (type === 'win') window.parent.NexoraSound.playWin();
+      if (type === 'over') window.parent.NexoraSound.playGameOver();
+    }
+  }
+
+  let board = [];
+  let score = 0;
+  let best = 0;
+  let undos = 3;
+  let prevBoard = null;
+  let prevScore = 0;
+
+  function init() {
+    board = Array(4).fill(null).map(() => Array(4).fill(0));
+    score = 0;
+    undos = 3;
+    prevBoard = null;
+    scoreVal.textContent = 0;
+    undoCountEl.textContent = undos;
+    overlay.classList.remove('open');
+
+    addRandomTile();
+    addRandomTile();
+    render();
+  }
+
+  function addRandomTile() {
+    const empty = [];
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (board[r][c] === 0) empty.push({ r, c });
+      }
+    }
+    if (empty.length > 0) {
+      const pick = empty[Math.floor(Math.random() * empty.length)];
+      board[pick.r][pick.c] = Math.random() < 0.9 ? 2 : 4;
+    }
+  }
+
+  function render() {
+    // Preserve overlay element
+    const ov = overlay;
+    boardEl.innerHTML = '';
+    boardEl.appendChild(ov);
+
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const val = board[r][c];
+        const tile = document.createElement('div');
+        tile.className = `tile tile-${val}`;
+        tile.textContent = val > 0 ? val : '';
+        boardEl.appendChild(tile);
+      }
+    }
+  }
+
+  function saveState() {
+    prevBoard = board.map(row => [...row]);
+    prevScore = score;
+  }
+
+  function undo() {
+    if (undos > 0 && prevBoard) {
+      board = prevBoard.map(row => [...row]);
+      score = prevScore;
+      undos--;
+      prevBoard = null;
+      scoreVal.textContent = score;
+      undoCountEl.textContent = undos;
+      overlay.classList.remove('open');
+      render();
+      playSound('slide');
+    }
+  }
+
+  btnUndo.addEventListener('click', undo);
+  btnRestart.addEventListener('click', init);
+  btnRetry.addEventListener('click', init);
+
+  function slide(dir) {
+    saveState();
+    let moved = false;
+    let gained = 0;
+
+    // Helper for sliding a single 1D array
+    function processLine(line) {
+      const filtered = line.filter(v => v !== 0);
+      const res = [];
+      for (let i = 0; i < filtered.length; i++) {
+        if (i < filtered.length - 1 && filtered[i] === filtered[i + 1]) {
+          const merged = filtered[i] * 2;
+          res.push(merged);
+          gained += merged;
+          i++;
+        } else {
+          res.push(filtered[i]);
+        }
+      }
+      while (res.length < 4) res.push(0);
+      return res;
+    }
+
+    if (dir === 'LEFT') {
+      for (let r = 0; r < 4; r++) {
+        const newLine = processLine(board[r]);
+        if (newLine.some((v, idx) => v !== board[r][idx])) moved = true;
+        board[r] = newLine;
+      }
+    } else if (dir === 'RIGHT') {
+      for (let r = 0; r < 4; r++) {
+        const reversed = [...board[r]].reverse();
+        const newLine = processLine(reversed).reverse();
+        if (newLine.some((v, idx) => v !== board[r][idx])) moved = true;
+        board[r] = newLine;
+      }
+    } else if (dir === 'UP') {
+      for (let c = 0; c < 4; c++) {
+        const col = [board[0][c], board[1][c], board[2][c], board[3][c]];
+        const newCol = processLine(col);
+        if (newCol.some((v, idx) => v !== board[idx][c])) moved = true;
+        for (let r = 0; r < 4; r++) board[r][c] = newCol[r];
+      }
+    } else if (dir === 'DOWN') {
+      for (let c = 0; c < 4; c++) {
+        const col = [board[3][c], board[2][c], board[1][c], board[0][c]];
+        const newCol = processLine(col).reverse();
+        if (newCol.some((v, idx) => v !== board[idx][c])) moved = true;
+        for (let r = 0; r < 4; r++) board[r][c] = newCol[r];
+      }
+    }
+
+    if (moved) {
+      score += gained;
+      scoreVal.textContent = score;
+      if (score > best) {
+        best = score;
+        bestVal.textContent = best;
+      }
+      if (gained > 0) playSound('merge');
+      else playSound('slide');
+
+      addRandomTile();
+      render();
+
+      if (checkGameOver()) {
+        playSound('over');
+        overlay.classList.add('open');
+        if (window.parent && window.parent.NexoraGuest) {
+          window.parent.NexoraGuest.recordGameScore('number-fusion', score);
+        }
+      }
+    }
+  }
+
+  function checkGameOver() {
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (board[r][c] === 0) return false;
+        if (r < 3 && board[r][c] === board[r + 1][c]) return false;
+        if (c < 3 && board[r][c] === board[r][c + 1]) return false;
+      }
+    }
+    return true;
+  }
+
+  // Keyboard navigation
+  window.addEventListener('keydown', e => {
+    if (['ArrowLeft', 'KeyA'].includes(e.code)) slide('LEFT');
+    if (['ArrowRight', 'KeyD'].includes(e.code)) slide('RIGHT');
+    if (['ArrowUp', 'KeyW'].includes(e.code)) slide('UP');
+    if (['ArrowDown', 'KeyS'].includes(e.code)) slide('DOWN');
+    if (e.code === 'KeyU') undo();
+  });
+
+  // Touch Swipes
+  let touchStartX = 0;
+  let touchStartY = 0;
+  boardEl.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  boardEl.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (dx > 30) slide('RIGHT');
+      else if (dx < -30) slide('LEFT');
+    } else {
+      if (dy > 30) slide('DOWN');
+      else if (dy < -30) slide('UP');
+    }
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>

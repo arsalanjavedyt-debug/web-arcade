@@ -1,0 +1,21 @@
+{
+  "title": "Draw & Guess",
+  "description": "The ultimate party showdown of artistic skill and rapid deductions! Take turns sketching mystery words on a real-time canvas while friends race to guess the answer.",
+  "category": "Multiplayer",
+  "difficulty": "Easy",
+  "duration": "3-5 min",
+  "icon": "🎨",
+  "isMultiplayer": true,
+  "added": "2026-11-02",
+  "instructions": [
+    "When it's your turn to draw, select your secret word and sketch clues on the canvas.",
+    "Do not write the letters of the word directly!",
+    "When other players draw, type your guesses in the chat box.",
+    "The quicker you guess correctly, the higher your bonus points!"
+  ],
+  "controls": [
+    "Mouse / Touch: Draw on canvas",
+    "Color Palette & Brush Sizes: Adjust artistic tools",
+    "Chat Box: Type your guess and press Enter"
+  ]
+}

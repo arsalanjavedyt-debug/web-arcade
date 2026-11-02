@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Memory Masters</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  body, html { width: 100%; height: 100%; overflow: hidden; background: #08090D; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #fff; display: flex; align-items: center; justify-content: center; }
+
+  .memory-wrap { width: 100%; max-width: 480px; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+
+  .header-bar { display: flex; align-items: center; justify-content: space-between; }
+  .title-group h1 { font-size: 26px; font-weight: 900; background: linear-gradient(135deg, #9B5CFF, #FF3366); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .title-group p { font-size: 12px; color: #969BAD; }
+
+  .stats-group { display: flex; gap: 8px; }
+  .stat-box { background: #171A25; border: 1px solid rgba(255, 255, 255, 0.08); padding: 6px 14px; border-radius: 8px; text-align: center; }
+  .stat-box span { font-size: 10px; text-transform: uppercase; color: #969BAD; display: block; }
+  .stat-box b { font-family: monospace; font-size: 16px; color: #00D9FF; }
+
+  /* 4x4 Cards Grid with 3D flip */
+  .cards-grid { width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 10px; perspective: 800px; }
+  
+  .card-item { position: relative; border-radius: 12px; cursor: pointer; transform-style: preserve-3d; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+  .card-item.flipped { transform: rotateY(180deg); }
+  .card-item.matched { transform: rotateY(180deg) scale(0.95); opacity: 0.8; pointer-events: none; }
+
+  .card-face { position: absolute; inset: 0; border-radius: 12px; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; font-size: 32px; }
+  
+  .card-back { background: #171A25; border: 2px solid rgba(155, 92, 255, 0.35); box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+  .card-back::after { content: '✦'; font-size: 20px; color: #9B5CFF; opacity: 0.4; }
+  .card-item:hover .card-back { border-color: #00D9FF; box-shadow: 0 0 15px rgba(0, 217, 255, 0.3); }
+
+  .card-front { background: #11131B; border: 2px solid #00D9FF; transform: rotateY(180deg); box-shadow: 0 0 20px rgba(0, 217, 255, 0.4); }
+
+  /* Screen Modal */
+  .screen { position: absolute; inset: 0; background: rgba(8, 9, 13, 0.88); backdrop-filter: blur(10px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; padding: 20px; }
+  .screen.hidden { display: none; }
+  .screen h2 { font-size: 32px; font-weight: 900; margin-bottom: 8px; background: linear-gradient(135deg, #49F5A0, #00D9FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .btn-play { background: linear-gradient(135deg, #9B5CFF, #00D9FF); border: none; color: #08090D; padding: 12px 32px; border-radius: 10px; font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 18px; }
+</style>
+</head>
+<body>
+
+<div class="memory-wrap">
+  <div class="header-bar">
+    <div class="title-group">
+      <h1>MEMORY MASTERS</h1>
+      <p>Match all 8 neural pairs</p>
+    </div>
+    <div class="stats-group">
+      <div class="stat-box"><span>Moves</span><b id="moves-val">0</b></div>
+      <div class="stat-box"><span>Time</span><b id="time-val" style="color:#FFB800;">60s</b></div>
+      <div class="stat-box"><span>Score</span><b id="score-val" style="color:#49F5A0;">0</b></div>
+    </div>
+  </div>
+
+  <div class="cards-grid" id="grid"></div>
+</div>
+
+<!-- Victory Screen -->
+<div class="screen hidden" id="win-screen">
+  <h2>MATRIX SYNCHRONIZED!</h2>
+  <p style="color:#969BAD; margin-bottom:8px;">All memory neural pairs matched successfully!</p>
+  <p style="font-size:22px; font-weight:800; color:#00D9FF;">Final Score: <span id="final-score">0</span></p>
+  <button class="btn-play" id="btn-play-again">PLAY AGAIN</button>
+</div>
+
+<script>
+(() => {
+  const grid = document.getElementById('grid');
+  const movesVal = document.getElementById('moves-val');
+  const timeVal = document.getElementById('time-val');
+  const scoreVal = document.getElementById('score-val');
+  const winScreen = document.getElementById('win-screen');
+  const finalScore = document.getElementById('final-score');
+  const btnPlayAgain = document.getElementById('btn-play-again');
+
+  function playSound(type) {
+    if (window.parent && window.parent.NexoraSound) {
+      if (type === 'flip') window.parent.NexoraSound.playClick();
+      if (type === 'match') window.parent.NexoraSound.playCollect();
+      if (type === 'mismatch') window.parent.NexoraSound.playHit();
+      if (type === 'win') window.parent.NexoraSound.playWin();
+    }
+  }
+
+  const SYMBOLS = ['🚀', '💎', '⚡', '👾', '🔮', '🛡️', '🪐', '🎯'];
+  let cards = [];
+  let flipped = [];
+  let moves = 0;
+  let score = 0;
+  let matchedPairs = 0;
+  let timeLeft = 60;
+  let timerInterval = null;
+  let lockBoard = false;
+
+  function initGame() {
+    winScreen.classList.add('hidden');
+    moves = 0;
+    score = 0;
+    matchedPairs = 0;
+    timeLeft = 60;
+    flipped = [];
+    lockBoard = false;
+
+    movesVal.textContent = moves;
+    timeVal.textContent = `${timeLeft}s`;
+    scoreVal.textContent = score;
+
+    // Duplicate and shuffle 8 pairs (16 cards)
+    const deck = [...SYMBOLS, ...SYMBOLS].sort(() => Math.random() - 0.5);
+
+    grid.innerHTML = '';
+    cards = deck.map((symbol, idx) => {
+      const card = document.createElement('div');
+      card.className = 'card-item';
+      card.dataset.symbol = symbol;
+      card.innerHTML = `
+        <div class="card-face card-back"></div>
+        <div class="card-face card-front">${symbol}</div>
+      `;
+      card.addEventListener('click', () => onCardClick(card));
+      grid.appendChild(card);
+      return card;
+    });
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      timeVal.textContent = `${timeLeft}s`;
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        alert('Time is up! Try again to beat the clock.');
+        initGame();
+      }
+    }, 1000);
+  }
+
+  function onCardClick(card) {
+    if (lockBoard || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+    card.classList.add('flipped');
+    flipped.push(card);
+    playSound('flip');
+
+    if (flipped.length === 2) {
+      moves++;
+      movesVal.textContent = moves;
+      checkMatch();
+    }
+  }
+
+  function checkMatch() {
+    lockBoard = true;
+    const [c1, c2] = flipped;
+    const isMatch = c1.dataset.symbol === c2.dataset.symbol;
+
+    if (isMatch) {
+      setTimeout(() => {
+        c1.classList.add('matched');
+        c2.classList.add('matched');
+        flipped = [];
+        lockBoard = false;
+        matchedPairs++;
+        score += 100 + timeLeft * 3;
+        scoreVal.textContent = score;
+        playSound('match');
+
+        if (matchedPairs === 8) {
+          clearInterval(timerInterval);
+          playSound('win');
+          finalScore.textContent = score;
+          winScreen.classList.remove('hidden');
+
+          if (window.parent && window.parent.NexoraGuest) {
+            window.parent.NexoraGuest.recordGameScore('memory-masters', score);
+          }
+        }
+      }, 400);
+    } else {
+      setTimeout(() => {
+        c1.classList.remove('flipped');
+        c2.classList.remove('flipped');
+        flipped = [];
+        lockBoard = false;
+        playSound('mismatch');
+      }, 850);
+    }
+  }
+
+  btnPlayAgain.addEventListener('click', initGame);
+  initGame();
+})();
+</script>
+</body>
+</html>

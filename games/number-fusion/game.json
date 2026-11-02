@@ -1,0 +1,21 @@
+{
+  "title": "Number Fusion",
+  "description": "Engage your mind in strategic number merging! Slide matching quantum numbers together to fuse higher values, plan combos, use tactical undos, and aim for the 2048 singularity.",
+  "category": "Puzzle",
+  "difficulty": "Medium",
+  "duration": "5-10 min",
+  "icon": "🔢",
+  "isMultiplayer": false,
+  "added": "2026-11-02",
+  "instructions": [
+    "Swipe or use arrow keys to shift all numbers in one of 4 cardinal directions.",
+    "When two identical number tiles collide during a move, they fuse into their sum value.",
+    "A new tile (2 or 4) spawns after every valid shift.",
+    "Use your 3 tactical UNDO charges if you make an accidental move!"
+  ],
+  "controls": [
+    "Arrow Keys / WASD: Slide tiles",
+    "Swipe Screen: Mobile gesture sliding",
+    "U Key / Undo Button: Revert last move (up to 3 uses)"
+  ]
+}
