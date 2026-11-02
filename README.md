@@ -64,6 +64,28 @@ Open the address `serve` prints.
 3. On netlify.com choose **Add new site › Import an existing project › GitHub**, pick the repo. Settings are read from `netlify.toml` (build command `node build.mjs`, publish directory `dist`). Click Deploy.
 4. Copy your `https://<name>.netlify.app` URL into `site.config.json` as `url`, commit and push.
 
+## Games Included
+
+1. **Neon Snake Deluxe** (`games/snake`): Cyberpunk retro arcade snake with powerups, combo multipliers, sound effects, and unlockable skins.
+2. **Neon Slither Arena** (`games/slither`): Slither.io-inspired mass multiplayer survival game featuring 12 vibrant skins, glowing energy orbs, boost trails, minimap radar, smart AI snakes, and real-time Socket.IO multiplayer.
+
+## Real-Time Multiplayer Server
+
+Neon Slither Arena includes dual modes:
+- **Single-Player Mode**: Runs client-side at 60 FPS with 20+ smart AI bots. Works anywhere (including static hosting on Netlify).
+- **Multiplayer Online Mode**: Connects to the included Node.js + Express + Socket.IO server.
+
+To run the multiplayer server locally:
+
+```bash
+# Start the full server on port 3000
+npm start
+# or
+npm run multiplayer
+```
+
+Then open `http://localhost:3000` in multiple browser windows or phones connected to the same Wi-Fi network to play against real humans!
+
 ## Generating thumbnails
 
 The build uses `games/<slug>/thumbnail.png` (640×400) as the card image and Open Graph image for each game. To auto-generate them with a headless browser:

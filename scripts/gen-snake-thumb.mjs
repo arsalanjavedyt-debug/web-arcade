@@ -172,3 +172,4 @@ const png = Buffer.concat([sig, IHDR, IDAT, IEND]);
 const ws = createWriteStream(OUT);
 ws.write(png);
 ws.end(() => console.log(`✓ Generated ${OUT} (${png.length} bytes)`));
+

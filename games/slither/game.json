@@ -1,0 +1,20 @@
+{
+  "title": "Neon Slither Arena",
+  "description": "Massive multiplayer snake survival arena. Collect glowing energy orbs, boost to outmaneuver rivals, trap opponents, and dominate the live leaderboard!",
+  "category": "Multiplayer",
+  "icon": "🐍",
+  "added": "2026-11-02",
+  "instructions": [
+    "Slither around the vast arena collecting glowing energy orbs to grow longer and thicker.",
+    "Do NOT hit another snake's body head-first or you will explode into collectible orbs!",
+    "Cut off opponents so their heads crash into your body to eliminate them and absorb their mass.",
+    "Boost with Left Click or Space (or touch button) for sudden speed bursts at the cost of a little mass.",
+    "Choose from 12 neon cyber skins and climb to #1 on the real-time leaderboard!"
+  ],
+  "controls": [
+    "Mouse or Touch to steer smoothly in any direction",
+    "Hold Left Mouse Button, Right Click, or Spacebar to boost",
+    "On Mobile: Virtual joystick or touch-follow with dedicated Boost button",
+    "Press ESC or P to pause single-player mode; F for fullscreen"
+  ]
+}
