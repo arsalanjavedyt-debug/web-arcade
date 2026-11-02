@@ -52,6 +52,10 @@ const adsenseTag = config.adsensePublisherId
 
 function layout({ title, description, pathName, body }) {
   const fullTitle = pathName === '/' ? `${config.name} - ${config.tagline}` : `${title} | ${config.name}`;
+  const navLinks = [['/', 'Games'], ['/about/', 'About'], ['/contact/', 'Contact']];
+  const nav = navLinks.map(([href, label]) =>
+    `<a href="${href}"${pathName === href ? ' class="active"' : ''}>${label}</a>`
+  ).join('');
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -63,21 +67,45 @@ function layout({ title, description, pathName, body }) {
 <meta property="og:title" content="${esc(fullTitle)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="/assets/style.css">
 ${adsenseTag}
 </head>
 <body>
 <header class="site"><div class="wrap">
   <a class="brand" href="/">${esc(config.name)}</a>
-  <nav><a href="/">Games</a><a href="/about/">About</a><a href="/contact/">Contact</a></nav>
+  <nav>${nav}</nav>
 </div></header>
-<main><div class="wrap">
+<main>
 ${body}
-</div></main>
-<footer class="site"><div class="wrap">
-  <div><a href="/about/">About</a><a href="/privacy/">Privacy Policy</a><a href="/contact/">Contact</a></div>
-  <div style="margin-top:8px">&copy; ${new Date().getFullYear()} ${esc(config.name)}</div>
-</div></footer>
+</main>
+<footer class="site">
+  <div class="wrap">
+    <div>
+      <div class="footer-brand">${esc(config.name)}</div>
+      <p class="footer-tagline">${esc(config.tagline)}</p>
+      <p class="footer-copy">&copy; ${new Date().getFullYear()} ${esc(config.name)}. All rights reserved.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Navigate</h4>
+      <ul>
+        <li><a href="/">All Games</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="/contact/">Contact</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <ul>
+        <li><a href="/privacy/">Privacy Policy</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    Free browser games &mdash; no download, no login, just play.
+  </div>
+</footer>
 </body>
 </html>`;
 }
@@ -87,54 +115,131 @@ const adSlot = (id) =>
     ? `<div class="ad-slot"><ins class="adsbygoogle" style="display:block" data-ad-client="${esc(config.adsensePublisherId)}" data-ad-slot="${esc(id)}" data-ad-format="auto" data-full-width-responsive="true"></ins><script>(adsbygoogle=window.adsbygoogle||[]).push({});</script></div>`
     : '';
 
-function card(g) {
+function isNewGame(g) {
+  if (!g.added) return false;
+  const d = new Date(g.added);
+  const now = new Date();
+  return (now - d) < 1000 * 60 * 60 * 24 * 30;
+}
+
+function card(g, forceNew = false) {
   const thumb = g.hasThumb
     ? `<img src="/play/${g.slug}/thumbnail.png" alt="${esc(g.title)}" loading="lazy">`
-    : g.icon;
-  return `<a class="card" href="/games/${g.slug}/">
+    : `<span style="filter:drop-shadow(0 0 12px rgba(0,229,255,.5))">${g.icon}</span>`;
+  const newBadge = (forceNew || isNewGame(g)) ? ' is-new' : '';
+  return `<a class="card${newBadge}" href="/games/${g.slug}/">
   <div class="thumb">${thumb}</div>
-  <div class="body"><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><span class="tag">${esc(g.category)}</span></div>
+  <div class="body">
+    <h3>${esc(g.title)}</h3>
+    <p>${esc(g.description)}</p>
+    <div class="meta">
+      <span class="tag">${esc(g.category)}</span>
+      <span class="play-icon">&#9654;</span>
+    </div>
+  </div>
 </a>`;
 }
 
 // ---------- pages ----------
 function homePage(games) {
+  const gameCount = games.length;
   const body = `
-<section class="hero"><h1>${esc(config.name)}</h1><p>${esc(config.tagline)}</p></section>
-<div class="grid">${games.map(card).join('\n')}</div>
-${games.length === 0 ? '<p style="text-align:center;color:var(--muted)">No games yet. Add a folder inside <code>games/</code> and push.</p>' : ''}
-<section class="block prose" style="margin:40px auto 0;text-align:center">
-  <h2>Play free games online</h2>
-  <p>${esc(config.name)} is a growing collection of free browser games that run on your phone, tablet or computer. There is nothing to install: pick a game, press play, and try to beat your best score.</p>
-</section>`;
-  return layout({ title: config.name, description: `${config.tagline} Play ${games.length} free games online.`, pathName: '/', body });
+<div class="wrap">
+<section class="hero">
+  <div class="hero-badge">Free Online Games</div>
+  <h1>${esc(config.name)}</h1>
+  <p>${esc(config.tagline)}</p>
+  <div class="hero-actions">
+    <a class="btn-primary" href="#games">Browse Games &#9654;</a>
+    <a class="btn-ghost" href="/about/">Learn More</a>
+  </div>
+</section>
+
+<div class="stats-bar">
+  <div class="stat-item">
+    <span class="stat-num">${gameCount}</span>
+    <span class="stat-label">Games</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-num">&#x221E;</span>
+    <span class="stat-label">Always Free</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-num">100%</span>
+    <span class="stat-label">Browser-Based</span>
+  </div>
+</div>
+
+<section id="games">
+  <div class="section-head">
+    <h2>All Games</h2>
+    <span class="section-link">${gameCount} title${gameCount !== 1 ? 's' : ''} available</span>
+  </div>
+  <div class="grid">${games.map((g, i) => card(g, i === 0)).join('\n')}</div>
+  ${gameCount === 0 ? '<p style="text-align:center;color:var(--muted)">No games yet. Add a folder inside <code>games/</code> and push.</p>' : ''}
+</section>
+
+<hr class="glow-line">
+
+<section style="max-width:600px;margin:0 auto 60px;text-align:center">
+  <h2 class="block" style="font-family:var(--font-head);font-size:1.7rem;font-weight:700;text-transform:uppercase;margin-bottom:12px">Play Free Games Online</h2>
+  <p style="color:var(--muted)">${esc(config.name)} is a growing collection of free browser games that run on your phone, tablet or computer. There is nothing to install &mdash; pick a game, press play, and try to beat your best score.</p>
+</section>
+</div>`;
+  return layout({ title: config.name, description: `${config.tagline} Play ${gameCount} free games online.`, pathName: '/', body });
 }
 
 function gamePage(g, games) {
   const others = games.filter((x) => x.slug !== g.slug).slice(0, 4);
-  const list = (arr) => `<ul>${arr.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`;
+  const listItems = (arr) => arr.map((i) => `<li>${esc(i)}</li>`).join('');
   const body = `
-<div class="crumbs"><a href="/">Games</a> &rsaquo; ${esc(g.title)}</div>
+<div class="wrap">
+<div class="crumbs"><a href="/">Games</a> <span>&rsaquo;</span> ${esc(g.title)}</div>
+<span class="game-category-pill">&#127918; ${esc(g.category)}</span>
 <h1 class="page">${esc(g.title)}</h1>
-<p style="color:var(--muted);margin:0 0 16px">${esc(g.description)}</p>
-<div class="player">
-  <iframe id="game" src="/play/${g.slug}/" title="${esc(g.title)}" allow="fullscreen; gamepad" loading="eager"></iframe>
-  <div class="bar"><span>${esc(g.category)} game</span><button class="btn" onclick="document.getElementById('game').requestFullscreen&&document.getElementById('game').requestFullscreen()">Fullscreen</button></div>
+
+<div class="game-layout">
+  <div>
+    <div class="player">
+      <iframe id="game" src="/play/${g.slug}/" title="${esc(g.title)}" allow="fullscreen; gamepad" loading="eager"></iframe>
+      <div class="bar">
+        <span>${esc(g.category)} Game</span>
+        <button class="btn" onclick="document.getElementById('game').requestFullscreen&&document.getElementById('game').requestFullscreen()">&#x26F6; Fullscreen</button>
+      </div>
+    </div>
+    ${adSlot(config.adSlotGameBottom)}
+    ${g.instructions.length ? `<div class="block"><h2>How to play ${esc(g.title)}</h2><ul>${listItems(g.instructions)}</ul></div>` : ''}
+  </div>
+
+  <aside class="game-info">
+    <div class="info-card">
+      <h3>About</h3>
+      <p style="color:var(--muted);font-size:.875rem;line-height:1.6">${esc(g.description)}</p>
+    </div>
+    ${g.controls.length ? `<div class="info-card"><h3>Controls</h3><ul>${listItems(g.controls)}</ul></div>` : ''}
+    <div class="info-card">
+      <h3>Details</h3>
+      <ul>
+        <li>Category: ${esc(g.category)}</li>
+        <li>Platform: Browser</li>
+        <li>Price: Free</li>
+      </ul>
+    </div>
+  </aside>
 </div>
-${adSlot(config.adSlotGameBottom)}
-${g.instructions.length ? `<section class="block"><h2>How to play ${esc(g.title)}</h2>${list(g.instructions)}</section>` : ''}
-${g.controls.length ? `<section class="block"><h2>Controls</h2>${list(g.controls)}</section>` : ''}
-${others.length ? `<section class="block"><h2>More games</h2><div class="grid">${others.map(card).join('')}</div></section>` : ''}`;
+
+${others.length ? `<section><div class="section-head"><h2>More Games</h2></div><div class="grid">${others.map(x => card(x)).join('')}</div></section>` : ''}
+</div>`;
   return layout({ title: `${g.title} - Play Free Online`, description: g.description, pathName: `/games/${g.slug}/`, body });
 }
 
 const staticPage = (title, pathName, description, inner) =>
-  layout({ title, description, pathName, body: `<article class="prose"><h1>${esc(title)}</h1>${inner}</article>` });
+  layout({ title, description, pathName, body: `<div class="wrap"><article class="prose"><h1>${esc(title)}</h1>${inner}</article></div>` });
 
 const aboutPage = () =>
   staticPage('About', '/about/', `About ${config.name}`, `
-<p>${esc(config.name)} is an independent collection of free browser games created by ${esc(config.owner)}. Every game here runs directly in your browser, works on desktop and mobile, and is free to play.</p>
-<p>New games are added regularly. If you have feedback, a bug report or a game idea, we would love to hear from you on the <a href="/contact/">contact page</a>.</p>`);
+<p>${esc(config.name)} is an independent collection of free browser games created by ${esc(config.owner)}. Every game here runs directly in your browser, works on desktop and mobile, and is completely free to play.</p>
+<p>New games are added regularly. If you have feedback, a bug report, or a game idea, we would love to hear from you on the <a href="/contact/">contact page</a>.</p>`);
 
 const contactPage = () =>
   staticPage('Contact', '/contact/', `Contact ${config.name}`, `
@@ -160,7 +265,7 @@ const privacyPage = () =>
 
 const notFoundPage = () =>
   layout({ title: 'Page not found', description: 'Page not found', pathName: '/404.html',
-    body: `<article class="prose"><h1>Page not found</h1><p>That page does not exist. <a href="/">Go back to the games</a>.</p></article>` });
+    body: `<div class="wrap" style="text-align:center;padding:80px 20px"><p style="font-family:var(--font-head);font-size:7rem;font-weight:700;color:var(--surface-2);line-height:1;margin:0">404</p><p style="color:var(--muted);margin:16px 0 24px;font-size:1.1rem">That page does not exist.</p><a class="btn-primary" href="/">&#8592; Back to Games</a></div>` });
 
 // ---------- build ----------
 async function write(rel, content) {
